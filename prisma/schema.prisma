@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model BetItem {
+  id         String   @id
+  ticketId   String
+  betType    BetType
+  number     String
+  amount     Decimal  @db.Decimal(12, 2)
+  payoutRate Decimal? @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  hitLabel   String?
+  isWinner   Boolean  @default(false)
+  winAmount  Decimal  @default(0) @db.Decimal(12, 2)
+  Ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([betType, number])
+  @@index([ticketId])
+}
+
+model BetRate {
+  id             String   @id
+  drawId         String
+  betType        BetType
+  payout         Decimal  @db.Decimal(10, 2)
+  commission     Decimal  @default(0) @db.Decimal(5, 2)
+  limitPerNumber Decimal? @db.Decimal(10, 2)
+  isOpen         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  Draw           Draw     @relation(fields: [drawId], references: [id], onDelete: Cascade)
+
+  @@unique([drawId, betType])
+}
+
+model Draw {
+  id          String      @id
+  code        String      @unique
+  name        String
+  drawDate    DateTime
+  openAt      DateTime
+  closeAt     DateTime
+  status      DrawStatus  @default(OPEN)
+  notes       String?
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  BetRate     BetRate[]
+  User        User        @relation(fields: [createdById], references: [id])
+  DrawResult  DrawResult?
+  Ticket      Ticket[]
+
+  @@index([status, drawDate])
+}
+
+model DrawResult {
+  id        String   @id
+  drawId    String   @unique
+  top3      String
+  top2      String?
+  bottom2   String
+  bottom3   String?
+  front3    String?
+  back3     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Draw      Draw     @relation(fields: [drawId], references: [id], onDelete: Cascade)
+}
+
+model Ticket {
+  id                           String       @id
+  code                         String       @unique
+  customerId                   String
+  agentId                      String
+  drawId                       String
+  status                       TicketStatus @default(CONFIRMED)
+  note                         String?
+  subtotal                     Decimal      @db.Decimal(12, 2)
+  discount                     Decimal      @default(0) @db.Decimal(12, 2)
+  total                        Decimal      @db.Decimal(12, 2)
+  createdAt                    DateTime     @default(now())
+  updatedAt                    DateTime
+  settledAt                    DateTime?
+  winAmount                    Decimal      @default(0) @db.Decimal(12, 2)
+  BetItem                      BetItem[]
+  User_Ticket_agentIdToUser    User         @relation("Ticket_agentIdToUser", fields: [agentId], references: [id])
+  User_Ticket_customerIdToUser User         @relation("Ticket_customerIdToUser", fields: [customerId], references: [id])
+  Draw                         Draw         @relation(fields: [drawId], references: [id])
+
+  @@index([agentId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([drawId, createdAt])
+}
+
+model User {
+  id                             String   @id
+  code                           String   @unique
+  username                       String   @unique
+  passwordHash                   String
+  passwordPlain                  String?
+  name                           String
+  phone                          String?
+  role                           Role
+  memberType                     MemberType?
+  isActive                       Boolean  @default(true)
+  ownerAgentId                   String?
+  parentMemberId                 String?
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime
+  Draw                           Draw[]
+  UserBetSetting                 UserBetSetting[]
+  PayoutProfile                  PayoutProfile[]
+  Ticket_Ticket_agentIdToUser    Ticket[] @relation("Ticket_agentIdToUser")
+  Ticket_Ticket_customerIdToUser Ticket[] @relation("Ticket_customerIdToUser")
+  User                           User?    @relation("UserToUser", fields: [ownerAgentId], references: [id])
+  other_User                     User[]   @relation("UserToUser")
+  ParentMember                   User?    @relation("MemberHierarchy", fields: [parentMemberId], references: [id])
+  ChildMembers                   User[]   @relation("MemberHierarchy")
+
+  @@index([ownerAgentId])
+  @@index([parentMemberId])
+  @@index([role])
+}
+
+model PayoutProfile {
+  id          String   @id
+  role        Role
+  betType     BetType
+  payout      Decimal  @default(0) @db.Decimal(10, 2)
+  commission  Decimal  @default(0) @db.Decimal(5, 2)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  User        User?    @relation(fields: [createdById], references: [id])
+
+  @@unique([role, betType])
+  @@index([role])
+}
+
+model UserBetSetting {
+  id         String   @id
+  userId     String
+  settingKey String
+  value      Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, settingKey])
+  @@index([userId])
+}
+
+model BlockedNumber {
+  id        String   @id
+  drawId    String?
+  groupKey  String
+  number    String
+  isBlocked Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([drawId, groupKey, number])
+  @@index([groupKey, number])
+}
+
+enum BetType {
+  TWO_TOP
+  TWO_BOTTOM
+  THREE_STRAIGHT
+  THREE_TOD
+  THREE_BOTTOM
+  FRONT_THREE
+  BACK_THREE
+  RUN_TOP
+  RUN_BOTTOM
+}
+
+enum DrawStatus {
+  UPCOMING
+  OPEN
+  CLOSED
+  RESULTED
+}
+
+enum Role {
+  ADMIN
+  AGENT
+  CUSTOMER
+}
+
+enum MemberType {
+  MEMBER
+  MAIN_MEMBER
+  CLIENT_MEMBER
+}
+
+enum TicketStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
