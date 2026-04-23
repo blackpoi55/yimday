@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #333333;
-  --muted: #f5f5f5;
-  --muted-foreground: #666666;
+  --background: #f3f7fb;
+  --foreground: #1e293b;
+  --muted: #eef4f8;
+  --muted-foreground: #64748b;
   --card: #ffffff;
-  --card-foreground: #333333;
-  --primary: #3c8dbc;
+  --card-foreground: #172033;
+  --primary: #155eef;
   --primary-foreground: #ffffff;
-  --secondary: #5cb85c;
+  --secondary: #0f766e;
   --secondary-foreground: #ffffff;
-  --accent: #d9edf7;
-  --accent-foreground: #31708f;
-  --border: #dddddd;
-  --ring: #66afe9;
-  --destructive: #d9534f;
+  --accent: #e0f2fe;
+  --accent-foreground: #075985;
+  --border: #d7e2ee;
+  --ring: #60a5fa;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --radius: 4px;
+  --radius: 12px;
 }
 
 @theme inline {
@@ -80,15 +80,15 @@
 
 @layer components {
   .panel {
-    @apply overflow-hidden rounded-sm border border-border bg-card text-card-foreground shadow-none;
+    @apply overflow-hidden rounded-[20px] border border-white/70 bg-card text-card-foreground shadow-[0_18px_48px_rgba(15,23,42,0.08)];
   }
 
   .panel-header {
-    @apply flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3;
+    @apply flex items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-4;
   }
 
   .panel-body {
-    @apply px-4 py-4;
+    @apply px-5 py-5;
   }
 
   .field {
@@ -106,7 +106,7 @@
   }
 
   .table-shell {
-    @apply overflow-hidden rounded-sm border border-border bg-white;
+    @apply overflow-hidden rounded-[22px] border border-white/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] shadow-[0_20px_50px_rgba(15,23,42,0.08)];
   }
 
   .table-shell table {
@@ -114,11 +114,11 @@
   }
 
   .table-shell th {
-    @apply border-b border-border bg-white px-3 py-2 text-left font-semibold text-foreground;
+    @apply border-b border-[#e2e8f0] bg-[#f8fbff] px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.04em] text-[#5b6b81];
   }
 
   .table-shell td {
-    @apply border-t border-border px-3 py-2 align-top;
+    @apply border-t border-[#edf2f7] px-4 py-3 align-top text-[14px];
   }
 
   .soft-divider {
@@ -186,31 +186,31 @@
   .legacy-btn-success,
   .legacy-btn-info,
   .legacy-btn-danger {
-    @apply inline-flex min-h-[34px] items-center justify-center rounded-sm border px-3 py-2 text-sm no-underline transition hover:no-underline;
+    @apply inline-flex min-h-[38px] items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium no-underline shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-[transform,box-shadow,background-color,border-color] duration-200 hover:-translate-y-px hover:no-underline;
   }
 
   .legacy-btn-default {
-    @apply border-[#cccccc] bg-white text-foreground hover:bg-[#e6e6e6];
+    @apply border-[#d7e2ee] bg-white text-foreground hover:bg-[#f8fafc];
   }
 
   .legacy-btn-primary {
-    @apply border-[#2e6da4] bg-[#337ab7] text-white hover:bg-[#286090] hover:text-white;
+    @apply border-[#155eef] bg-[#155eef] text-white hover:bg-[#0f4bcc] hover:text-white;
   }
 
   .legacy-btn-success {
-    @apply border-[#4cae4c] bg-[#5cb85c] text-white hover:bg-[#449d44] hover:text-white;
+    @apply border-[#0f766e] bg-[#0f766e] text-white hover:bg-[#0b5f59] hover:text-white;
   }
 
   .legacy-btn-info {
-    @apply border-[#46b8da] bg-[#5bc0de] text-white hover:bg-[#31b0d5] hover:text-white;
+    @apply border-[#0284c7] bg-[#0284c7] text-white hover:bg-[#0369a1] hover:text-white;
   }
 
   .legacy-btn-danger {
-    @apply border-[#d43f3a] bg-[#d9534f] text-white hover:bg-[#c9302c] hover:text-white;
+    @apply border-[#dc2626] bg-[#dc2626] text-white hover:bg-[#b91c1c] hover:text-white;
   }
 
   .legacy-btn-warning {
-    @apply border-[#eea236] bg-[#f0ad4e] text-white hover:bg-[#ec971f] hover:text-white;
+    @apply border-[#d97706] bg-[#f59e0b] text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)] hover:bg-[#d97706] hover:text-white;
   }
 
   .legacy-tab-nav {
@@ -218,11 +218,11 @@
   }
 
   .legacy-tab-link {
-    @apply inline-flex h-[42px] items-center rounded-t-sm border border-transparent px-[15px] text-sm text-[#337ab7] no-underline transition hover:bg-muted hover:text-[#23527c] hover:no-underline;
+    @apply inline-flex h-[44px] items-center rounded-t-xl border border-transparent px-[16px] text-sm font-medium text-[#3b82a0] no-underline transition hover:bg-[#eef6ff] hover:text-[#155eef] hover:no-underline;
   }
 
   .legacy-tab-link.active {
-    @apply border-border border-b-white bg-white text-foreground;
+    @apply border-[#d7e2ee] border-b-white bg-white text-foreground shadow-[0_-8px_20px_rgba(15,23,42,0.04)];
   }
 
   .legacy-subtab-link {
@@ -278,7 +278,7 @@
   }
 
   .legacy-monitor-search-btn {
-    @apply inline-flex h-[34px] w-[40px] items-center justify-center rounded-[4px] border border-[#4cae4c] bg-[#5cb85c] text-white;
+    @apply inline-flex h-[38px] w-[42px] items-center justify-center rounded-xl border border-[#0f766e] bg-[#0f766e] text-white shadow-[0_10px_24px_rgba(15,118,110,0.22)];
   }
 
   .legacy-monitor-shell {
@@ -298,11 +298,11 @@
   }
 
   .legacy-modal-backdrop {
-    @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12;
+    @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(15,23,42,0.45)] px-4 py-10 backdrop-blur-[8px];
   }
 
   .legacy-modal {
-    @apply w-full rounded-sm bg-white shadow-[0_5px_15px_rgba(0,0,0,0.5)];
+    @apply w-full overflow-hidden rounded-[26px] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_30px_80px_rgba(15,23,42,0.28)];
   }
 
   .legacy-modal-sm {
@@ -318,23 +318,23 @@
   }
 
   .legacy-modal-header {
-    @apply flex items-center justify-between border-b border-border px-4 py-3;
+    @apply flex items-center justify-between border-b border-[#e2e8f0] bg-[radial-gradient(circle_at_top_left,#eff6ff_0%,#ffffff_55%)] px-6 py-5;
   }
 
   .legacy-modal-header h4 {
-    @apply m-0 text-[18px] font-medium text-foreground;
+    @apply m-0 text-[20px] font-semibold tracking-[-0.02em] text-[#0f172a];
   }
 
   .legacy-modal-close {
-    @apply border-0 bg-transparent p-0 text-[28px] leading-none text-[#999999];
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e2e8f0] bg-white p-0 text-[24px] leading-none text-[#64748b] transition hover:bg-[#f8fafc] hover:text-[#0f172a];
   }
 
   .legacy-modal-body {
-    @apply px-4 py-4;
+    @apply px-6 py-6;
   }
 
   .legacy-modal-footer {
-    @apply border-t border-border px-4 py-3;
+    @apply border-t border-[#e2e8f0] bg-[#fbfdff] px-6 py-4;
   }
 
   .legacy-modal-grid {
@@ -362,15 +362,23 @@
   }
 
   .legacy-period-table {
-    @apply w-full border-collapse bg-white text-sm;
+    @apply w-full border-separate border-spacing-0 bg-transparent text-sm;
   }
 
   .legacy-period-table thead th {
-    @apply border border-[#cbe5f3] bg-[#d9edf7] px-4 py-3 text-left text-[14px] font-semibold text-[#333];
+    @apply border-b border-[#dbe7f3] bg-[linear-gradient(180deg,#f8fbff_0%,#eef6ff_100%)] px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-[0.05em] text-[#60758d];
   }
 
   .legacy-period-table tbody td {
-    @apply border border-border px-4 py-2 align-middle text-[16px] text-[#333];
+    @apply border-b border-[#edf2f7] bg-white px-4 py-3 align-middle text-[15px] text-[#1f2937] transition-colors;
+  }
+
+  .legacy-period-table tbody tr:nth-child(even) td {
+    @apply bg-[#fbfdff];
+  }
+
+  .legacy-period-table tbody tr:hover td {
+    @apply bg-[#f3f8ff];
   }
 
   .legacy-period-modal-grid {
@@ -382,15 +390,15 @@
   }
 
   .legacy-ticket-detail-table {
-    @apply w-full border-collapse text-sm;
+    @apply w-full border-separate border-spacing-0 overflow-hidden rounded-2xl border border-[#e6edf5] bg-white text-sm shadow-[0_12px_30px_rgba(15,23,42,0.06)];
   }
 
   .legacy-ticket-detail-table th {
-    @apply border-b border-border px-2 py-2 text-left font-semibold text-[#333];
+    @apply border-b border-[#e6edf5] bg-[#f8fbff] px-3 py-3 text-left text-[12px] font-semibold uppercase tracking-[0.05em] text-[#60758d];
   }
 
   .legacy-ticket-detail-table td {
-    @apply border-b border-border px-2 py-3 align-top text-[15px] text-[#333];
+    @apply border-b border-[#edf2f7] px-3 py-3 align-top text-[14px] text-[#1f2937];
   }
 
   .legacy-monitor-table {
@@ -410,6 +418,46 @@
 
   .legacy-monitor-table td.over {
     color: #a94442;
+  }
+
+  .legacy-monitor-grid-table {
+    @apply w-full border-separate border-spacing-0 table-fixed bg-transparent;
+  }
+
+  .legacy-monitor-grid-cell {
+    @apply border-r border-b border-[#e5edf5] bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] px-4 py-4 text-[15px] font-medium text-[#334155] transition-[transform,background-color,color,box-shadow] duration-200;
+  }
+
+  .legacy-monitor-grid-table tbody tr:first-child .legacy-monitor-grid-cell {
+    @apply border-t-0;
+  }
+
+  .legacy-monitor-grid-table tbody tr .legacy-monitor-grid-cell:first-child {
+    @apply border-l-0;
+  }
+
+  .legacy-monitor-grid-table tbody tr .legacy-monitor-grid-cell:last-child {
+    @apply border-r-0;
+  }
+
+  .legacy-monitor-grid-table tbody tr:last-child .legacy-monitor-grid-cell {
+    @apply border-b-0;
+  }
+
+  .legacy-monitor-grid-cell-active {
+    @apply cursor-pointer bg-[linear-gradient(180deg,#efffd2_0%,#d8f4a2_100%)] font-semibold text-[#22324a] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)];
+  }
+
+  .legacy-monitor-grid-cell-active:hover {
+    @apply bg-[linear-gradient(180deg,#e8ffc8_0%,#caef8c_100%)] text-[#0f172a];
+  }
+
+  .legacy-monitor-grid-cell-over {
+    @apply bg-[linear-gradient(180deg,#efffd2_0%,#d8f4a2_100%)] text-[#d11f1f];
+  }
+
+  .legacy-monitor-grid-cell-over:hover {
+    @apply bg-[linear-gradient(180deg,#e8ffc8_0%,#caef8c_100%)] text-[#b91c1c];
   }
 
   .size-14px {

@@ -189,6 +189,18 @@ function collectRemainingTotal(rows: DetailRow[]) {
   return rows.reduce((sum, row) => sum + row.amount, 0);
 }
 
+function getMonitorCellClass(active: boolean, over: boolean) {
+  if (!active) {
+    return "legacy-monitor-grid-cell";
+  }
+
+  if (over) {
+    return "legacy-monitor-grid-cell legacy-monitor-grid-cell-active legacy-monitor-grid-cell-over";
+  }
+
+  return "legacy-monitor-grid-cell legacy-monitor-grid-cell-active";
+}
+
 function buildThreeTodRows(bucket: string, totals: Record<string, number>) {
   return Array.from({ length: 10 }, (_, second) =>
     Array.from({ length: 10 }, (_, third) => {
@@ -368,107 +380,86 @@ export function MonitorClient({
 
   function renderGridTable(rows: GridCell[][], limit?: number | null, tab?: string) {
     return (
-      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell) => {
-                const over = typeof limit === "number" && limit > 0 && cell.total >= limit;
-                const active = cell.total > 0;
+      <div className="table-shell overflow-hidden">
+        <table className="legacy-monitor-grid-table">
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell) => {
+                  const over = typeof limit === "number" && limit > 0 && cell.total >= limit;
+                  const active = cell.total > 0;
 
-                return (
-                  <td
-                    key={cell.number}
-                    onClick={active && tab ? () => openDetail(cell.number, tab) : undefined}
-                    style={{
-                      border: "1px solid #ddd",
-                      background: active ? "#dff7b4" : "#fff",
-                      color: over ? "red" : "#333",
-                      cursor: active ? "pointer" : "default",
-                      fontWeight: active ? 700 : 400,
-                      fontSize: "16px",
-                      padding: "8px 10px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {cell.number} = {formatCurrency(cell.total)}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  return (
+                    <td
+                      key={cell.number}
+                      className={getMonitorCellClass(active, over)}
+                      onClick={active && tab ? () => openDetail(cell.number, tab) : undefined}
+                    >
+                      {cell.number} = {formatCurrency(cell.total)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
   function renderSingleRowTable(items: GridCell[], limit?: number | null, tab?: string) {
     return (
-      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-        <tbody>
-          <tr>
-            {items.map((item) => {
-              const over = typeof limit === "number" && limit > 0 && item.total >= limit;
-              const active = item.total > 0;
+      <div className="table-shell overflow-hidden">
+        <table className="legacy-monitor-grid-table">
+          <tbody>
+            <tr>
+              {items.map((item) => {
+                const over = typeof limit === "number" && limit > 0 && item.total >= limit;
+                const active = item.total > 0;
 
-              return (
-                <td
-                  key={item.number}
-                  onClick={active && tab ? () => openDetail(item.number, tab) : undefined}
-                  style={{
-                    border: "1px solid #ddd",
-                    background: active ? "#dff7b4" : "#fff",
-                    color: over ? "red" : "#333",
-                    cursor: active ? "pointer" : "default",
-                    fontWeight: active ? 700 : 400,
-                    fontSize: "16px",
-                    padding: "10px 12px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {item.number} = {formatCurrency(item.total)}
-                </td>
-              );
-            })}
-          </tr>
-        </tbody>
-      </table>
+                return (
+                  <td
+                    key={item.number}
+                    className={getMonitorCellClass(active, over)}
+                    onClick={active && tab ? () => openDetail(item.number, tab) : undefined}
+                  >
+                    {item.number} = {formatCurrency(item.total)}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
     );
   }
 
   function renderThreeTodTable(rows: GridCell[][], limit?: number | null) {
     return (
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell) => {
-                const over = typeof limit === "number" && limit > 0 && cell.total >= limit;
-                const active = cell.total > 0;
+      <div className="table-shell overflow-hidden">
+        <table className="legacy-monitor-grid-table">
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell) => {
+                  const over = typeof limit === "number" && limit > 0 && cell.total >= limit;
+                  const active = cell.total > 0;
 
-                return (
-                  <td
-                    key={cell.number}
-                    onClick={active ? () => openDetail(cell.number, "three-tod") : undefined}
-                    style={{
-                      border: "1px solid #ddd",
-                      background: active ? "#dff7b4" : "#fff",
-                      color: over ? "red" : "#333",
-                      cursor: active ? "pointer" : "default",
-                      fontWeight: active ? 700 : 400,
-                      fontSize: "16px",
-                      padding: "10px 12px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {cell.number} = {formatCurrency(cell.total)}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  return (
+                    <td
+                      key={cell.number}
+                      className={getMonitorCellClass(active, over)}
+                      onClick={active ? () => openDetail(cell.number, "three-tod") : undefined}
+                    >
+                      {cell.number} = {formatCurrency(cell.total)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
@@ -532,20 +523,21 @@ export function MonitorClient({
   return (
     <>
       <div className="legacy-monitor-shell">
-        <form action="/dashboard/monitor" className="legacy-monitor-toolbar">
-          <input name="tab" type="hidden" value={selectedTab} />
-          <input name="bucket" type="hidden" value={selectedBucket} />
-          <select className="legacy-monitor-select" defaultValue={selectedDrawId} name="drawId">
+        <div className="legacy-monitor-toolbar">
+          <select
+            className="legacy-monitor-select"
+            value={selectedDrawId}
+            onChange={(event) => {
+              router.push(buildHref(event.target.value, selectedTab, selectedBucket));
+            }}
+          >
             {draws.map((draw) => (
               <option key={draw.id} value={draw.id}>
                 {draw.name}
               </option>
             ))}
           </select>
-          <button className="legacy-monitor-search-btn" type="submit">
-            <Search className="size-4" strokeWidth={2.5} />
-          </button>
-        </form>
+        </div>
 
         <div className="mt-[15px]">
           <div className="legacy-tab-nav">
