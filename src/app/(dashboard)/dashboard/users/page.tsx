@@ -1,4 +1,4 @@
-import { MemberType, Role } from "@prisma/client";
+import { MemberType, Role, type Prisma } from "@prisma/client";
 import Link from "next/link";
 import { Eye, Pencil } from "lucide-react";
 import { UsersPageClient } from "@/components/users/users-page-client";
@@ -13,8 +13,11 @@ type UsersPageProps = {
   searchParams?: Promise<{
     tab?: string;
     error?: string;
+    scope?: string;
   }>;
 };
+
+type AgentMemberScope = "all" | "mine" | "tickets";
 
 type UserRowData = {
   id: string;
@@ -26,6 +29,7 @@ type UserRowData = {
   phone: string | null;
   role: Role;
   memberType: MemberType | null;
+  isSharedMember: boolean;
   ownerAgentId: string | null;
   parentMemberId: string | null;
   managerName: string;
@@ -49,6 +53,70 @@ type AgentMainMemberGroup = {
   name: string;
   members: AgentMemberRow[];
 };
+
+const agentMemberScopeLinks: Array<{ scope: AgentMemberScope; label: string; href: string }> = [
+  { scope: "all", label: "สมาชิกทั้งหมด", href: "/dashboard/users" },
+  { scope: "mine", label: "เฉพาะสมาชิกของเรา", href: "/dashboard/users?scope=mine" },
+  { scope: "tickets", label: "เฉพาะสมาชิกที่มีโพย", href: "/dashboard/users?scope=tickets" },
+];
+
+function getAgentMemberScope(value?: string): AgentMemberScope {
+  return value === "mine" || value === "tickets" ? value : "all";
+}
+
+function buildAgentMemberWhere(agentId: string, scope: AgentMemberScope, currentDrawId?: string | null): Prisma.UserWhereInput {
+  if (scope === "mine") {
+    return {
+      role: Role.CUSTOMER,
+      isActive: true,
+      OR: [
+        { ownerAgentId: agentId },
+        {
+          ParentMember: {
+            ownerAgentId: agentId,
+          },
+        },
+      ],
+    };
+  }
+
+  if (scope === "tickets") {
+    if (!currentDrawId) {
+      return {
+        id: "__no_open_draw__",
+        role: Role.CUSTOMER,
+        isActive: true,
+      };
+    }
+
+    return {
+      role: Role.CUSTOMER,
+      isActive: true,
+      OR: [
+        {
+          Ticket_Ticket_customerIdToUser: {
+            some: {
+              agentId,
+              drawId: currentDrawId,
+            },
+          },
+        },
+        {
+          ParentMember: {
+            Ticket_Ticket_customerIdToUser: {
+              some: {
+                agentId,
+                drawId: currentDrawId,
+              },
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  return buildAgentCustomerWhere(agentId);
+}
 
 function decorateDisplayFields(user: UserRowData) {
   let tableUsername = user.username;
@@ -129,10 +197,14 @@ function AgentMembersPage({
   members,
   mainMemberGroups,
   errorMessage,
+  selectedScope,
+  currentDrawName,
 }: {
   members: AgentMemberRow[];
   mainMemberGroups: AgentMainMemberGroup[];
   errorMessage: string | null;
+  selectedScope: AgentMemberScope;
+  currentDrawName?: string | null;
 }) {
   return (
     <div className="space-y-4">
@@ -143,6 +215,18 @@ function AgentMembersPage({
         <div className="panel-body space-y-4">
           {errorMessage ? (
             <div className="rounded-sm border border-[#ebccd1] bg-[#f2dede] px-4 py-3 text-sm text-[#a94442]">{errorMessage}</div>
+          ) : null}
+          <div className="legacy-tab-nav">
+            {agentMemberScopeLinks.map((item) => (
+              <Link key={item.scope} className={selectedScope === item.scope ? "legacy-tab-link active" : "legacy-tab-link"} href={item.href}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          {selectedScope === "tickets" ? (
+            <div className="rounded-sm border border-[#bce8f1] bg-[#d9edf7] px-4 py-3 text-sm text-[#31708f]">
+              {currentDrawName ? `แสดงเฉพาะสมาชิกที่มีโพยในงวด: ${currentDrawName}` : "ไม่พบงวดปัจจุบันที่เปิดรับโพย"}
+            </div>
           ) : null}
           <AgentMembersTable members={members} />
         </div>
@@ -168,8 +252,24 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const selectedTab = resolvedSearchParams.tab === "staff" ? "staff" : resolvedSearchParams.tab === "client" ? "client" : "member";
 
   if (session.role === Role.AGENT) {
+    const selectedScope = getAgentMemberScope(resolvedSearchParams.scope);
+    const currentDraw =
+      selectedScope === "tickets"
+        ? await prisma.draw.findFirst({
+            where: {
+              status: "OPEN",
+            },
+            orderBy: {
+              closeAt: "asc",
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+          })
+        : null;
     const members = (await prisma.user.findMany({
-      where: buildAgentCustomerWhere(session.userId),
+      where: buildAgentMemberWhere(session.userId, selectedScope, currentDraw?.id),
       select: {
         id: true,
         name: true,
@@ -192,13 +292,15 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     return (
       <AgentMembersPage
         errorMessage={getAgentErrorMessage(resolvedSearchParams.error)}
+        currentDrawName={currentDraw?.name}
         mainMemberGroups={mainMemberGroups}
         members={regularMembers}
+        selectedScope={selectedScope}
       />
     );
   }
 
-  const [customers, clientCustomers, staffs, mainMembers, memberDefaultProfiles, clientDefaultProfiles] = await Promise.all([
+  const [customers, clientCustomers, staffs, mainMembers, agents, memberDefaultProfiles, clientDefaultProfiles] = await Promise.all([
     prisma.$queryRaw<UserRowData[]>`
       SELECT
         u.id,
@@ -208,11 +310,16 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         u.phone,
         u.role,
         COALESCE(u."memberType", ${MemberType.MEMBER}::"MemberType") AS "memberType",
+        u."isSharedMember",
         u."ownerAgentId",
         u."parentMemberId",
-        u.username AS "managerName",
+        CASE
+          WHEN u."isSharedMember" THEN 'ทุกคน'
+          ELSE COALESCE(owner.name, '-')
+        END AS "managerName",
         u."isActive"
       FROM "User" u
+      LEFT JOIN "User" owner ON owner.id = u."ownerAgentId"
       WHERE u.role = ${Role.CUSTOMER}::"Role"
         AND COALESCE(u."memberType", ${MemberType.MEMBER}::"MemberType") <> ${MemberType.CLIENT_MEMBER}::"MemberType"
       ORDER BY u."createdAt" ASC
@@ -226,6 +333,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         u.phone,
         u.role,
         COALESCE(u."memberType", ${MemberType.MEMBER}::"MemberType") AS "memberType",
+        u."isSharedMember",
         u."ownerAgentId",
         u."parentMemberId",
         COALESCE(parent.name, '-') AS "managerName",
@@ -245,6 +353,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         u.phone,
         u.role,
         u."memberType",
+        false AS "isSharedMember",
         u."ownerAgentId",
         u."parentMemberId",
         u.username AS "managerName",
@@ -257,6 +366,18 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       where: {
         role: Role.CUSTOMER,
         memberType: MemberType.MAIN_MEMBER,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
+    prisma.user.findMany({
+      where: {
+        role: Role.AGENT,
       },
       select: {
         id: true,
@@ -284,6 +405,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
   return (
     <UsersPageClient
+      agents={agents as UserOption[]}
       defaultCompatSettings={defaultCompatSettings}
       mainMembers={mainMembers as UserOption[]}
       selectedTab={selectedTab}

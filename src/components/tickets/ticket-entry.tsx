@@ -1,19 +1,21 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { BetType, Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { FormSubmit } from "@/components/ui/form-submit";
+import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createTicketAction, type TicketActionState } from "@/lib/actions/tickets";
+import { createTicketAction, updateTicketAction, type TicketActionState } from "@/lib/actions/tickets";
 import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
 import { betTypeLabels } from "@/lib/constants";
 import { compatSettingsToCommissionEntries, type UserCompatSettings } from "@/lib/php-compat-shared";
 import { parsePhpTicketInput, type LegacyDisplayType, type ParsedPhpTicketLine } from "@/lib/php-ticket-parser";
+import { parseQuickEntry, type QuickEntryMode } from "@/lib/quick-entry";
 import { formatCurrency } from "@/lib/utils";
 
 type DrawOption = {
@@ -31,7 +33,6 @@ type DrawOption = {
 type CustomerOption = {
   id: string;
   name: string;
-  code: string;
   role: Role;
 };
 
@@ -49,6 +50,10 @@ type TicketEntryProps = {
   role: "ADMIN" | "AGENT" | "CUSTOMER";
   defaultCustomerId?: string;
   defaultDrawId?: string;
+  initialLines?: LocalLine[];
+  initialNote?: string | null;
+  mode?: "create" | "edit";
+  ticketId?: string;
 };
 
 type LocalLine = ParsedPhpTicketLine;
@@ -85,6 +90,89 @@ const previewOrder: LegacyDisplayType[] = [
   "RUN_BOTTOM",
 ];
 
+const quickModeLabels: Record<QuickEntryMode, string> = {
+  TOP: "คีย์บน",
+  BOTTOM: "คีย์ล่าง",
+  MIXED: "คีย์บน+ล่าง",
+};
+
+const quickModePlaceholders: Record<QuickEntryMode, string> = {
+  TOP: "00=200\n01=200\n001*=150\n103=500*500\n24=*200\n5=5000",
+  BOTTOM: "01=200*200\n080=200\n64=100/50\n264=300\n6=500",
+  MIXED: "12=100\n12=100/50\n123=100\n123=100*50/30\n5=300",
+};
+
+const helperTypes: Array<{
+  key: LegacyDisplayType;
+  betType: BetType;
+  digits: number;
+  label: string;
+}> = [
+  { key: "TWO_TOP", betType: BetType.TWO_TOP, digits: 2, label: "2 ตัวบน" },
+  { key: "TWO_BOTTOM", betType: BetType.TWO_BOTTOM, digits: 2, label: "2 ตัวล่าง" },
+  { key: "TWO_TOD", betType: BetType.TWO_TOP, digits: 2, label: "คู่โต๊ด" },
+  { key: "THREE_STRAIGHT", betType: BetType.THREE_STRAIGHT, digits: 3, label: "3 ตัวบน" },
+  { key: "THREE_TOD", betType: BetType.THREE_TOD, digits: 3, label: "3 โต๊ด" },
+  { key: "THREE_BOTTOM", betType: BetType.THREE_BOTTOM, digits: 3, label: "3 ตัวล่าง" },
+  { key: "RUN_TOP", betType: BetType.RUN_TOP, digits: 1, label: "วิ่งบน" },
+  { key: "RUN_BOTTOM", betType: BetType.RUN_BOTTOM, digits: 1, label: "วิ่งล่าง" },
+];
+
+const helperAmountPresets = [50, 100, 200, 300, 500, 1000];
+
+type EntryMode = "HELPER" | "QUICK" | "PHP";
+
+const entryModeOptions: Array<{
+  key: EntryMode;
+  label: string;
+}> = [
+  { key: "HELPER", label: "Tool ช่วยคีย์" },
+  { key: "QUICK", label: "คีย์ลัดแบบเร็ว" },
+  { key: "PHP", label: "ฟอร์แมต PHP" },
+];
+
+function sortDigits(value: string) {
+  return value.split("").sort().join("");
+}
+
+function normalizeHelperNumber(value: string, type: LegacyDisplayType) {
+  const config = helperTypes.find((item) => item.key === type);
+  if (!config) {
+    return "";
+  }
+
+  const digits = value.replace(/\D/g, "").slice(0, config.digits);
+
+  if (type === "TWO_TOD" || type === "THREE_TOD") {
+    return sortDigits(digits);
+  }
+
+  return digits;
+}
+
+function buildHelperSource(type: LegacyDisplayType, number: string, amount: number) {
+  switch (type) {
+    case "TWO_TOP":
+      return `บ:${number}=${amount}`;
+    case "TWO_BOTTOM":
+      return `ล:${number}=${amount}`;
+    case "TWO_TOD":
+      return `บ:${number}=*${amount}`;
+    case "THREE_STRAIGHT":
+      return `บ:${number}=${amount}`;
+    case "THREE_TOD":
+      return `บ:${number}*${amount}`;
+    case "THREE_BOTTOM":
+      return `ล:${number}=${amount}`;
+    case "RUN_TOP":
+      return `บ:${number}=${amount}`;
+    case "RUN_BOTTOM":
+      return `ล:${number}=${amount}`;
+    default:
+      return `${number}=${amount}`;
+  }
+}
+
 function buildPreviewGroups(lines: LocalLine[]) {
   return previewOrder
     .map((key) => ({
@@ -106,15 +194,28 @@ export function TicketEntry({
   role,
   defaultCustomerId,
   defaultDrawId,
+  initialLines = [],
+  initialNote,
+  mode = "create",
+  ticketId,
 }: TicketEntryProps) {
   const router = useRouter();
-  const [state, action] = useActionState(createTicketAction, initialState);
+  const [state, action] = useActionState(mode === "edit" ? updateTicketAction : createTicketAction, initialState);
   const [selectedDrawId, setSelectedDrawId] = useState(defaultDrawId ?? draws[0]?.id ?? "");
   const [selectedCustomerId, setSelectedCustomerId] = useState(defaultCustomerId ?? customers[0]?.id ?? "");
+  const [entryMode, setEntryMode] = useState<EntryMode>("HELPER");
+  const [helperType, setHelperType] = useState<LegacyDisplayType>("TWO_TOP");
+  const [helperNumber, setHelperNumber] = useState("");
+  const [helperAmount, setHelperAmount] = useState("");
+  const [helperError, setHelperError] = useState("");
+  const [quickMode, setQuickMode] = useState<QuickEntryMode>("TOP");
+  const [quickText, setQuickText] = useState("");
+  const [quickError, setQuickError] = useState("");
   const [rawText, setRawText] = useState("");
   const [parseError, setParseError] = useState("");
-  const [lines, setLines] = useState<LocalLine[]>([]);
+  const [lines, setLines] = useState<LocalLine[]>(initialLines);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const helperNumberRef = useRef<HTMLInputElement | null>(null);
 
   const selectedDraw = useMemo(
     () => draws.find((draw) => draw.id === selectedDrawId) ?? draws[0],
@@ -160,6 +261,17 @@ export function TicketEntry({
   }, [commissionMap, lines]);
 
   const previewGroups = useMemo(() => buildPreviewGroups(lines), [lines]);
+  const helperConfig = useMemo(
+    () => helperTypes.find((item) => item.key === helperType) ?? helperTypes[0]!,
+    [helperType],
+  );
+  const helperPreview = useMemo(() => {
+    const normalizedNumber = normalizeHelperNumber(helperNumber, helperType);
+    const parsedAmount = Number(helperAmount);
+    const safeAmount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 0;
+
+    return normalizedNumber && safeAmount > 0 ? buildHelperSource(helperType, normalizedNumber, safeAmount) : "";
+  }, [helperAmount, helperNumber, helperType]);
 
   useEffect(() => {
     if (state.error) {
@@ -193,6 +305,50 @@ export function TicketEntry({
     setPreviewOpen(true);
   }
 
+  function parseQuickInput() {
+    const parsed = parseQuickEntry(quickMode, quickText);
+
+    if ("error" in parsed) {
+      setQuickError(parsed.error);
+      setPreviewOpen(false);
+      return;
+    }
+
+    setQuickError("");
+    setParseError("");
+    setLines(parsed.lines.map((line) => ({ ...line, displayType: line.betType })));
+    setPreviewOpen(true);
+  }
+
+  function addHelperLine() {
+    const normalizedNumber = normalizeHelperNumber(helperNumber, helperType);
+    const amount = Number(helperAmount);
+
+    if (normalizedNumber.length !== helperConfig.digits) {
+      setHelperError(`เลขต้องมี ${helperConfig.digits} หลัก`);
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setHelperError("จำนวนเงินต้องมากกว่า 0");
+      return;
+    }
+
+    setHelperError("");
+    setLines((current) => [
+      ...current,
+      {
+        betType: helperConfig.betType,
+        displayType: helperType,
+        number: normalizedNumber,
+        amount,
+        source: buildHelperSource(helperType, normalizedNumber, amount),
+      },
+    ]);
+    setHelperNumber("");
+    helperNumberRef.current?.focus();
+  }
+
   function removeLine(index: number) {
     setLines((current) => current.filter((_, lineIndex) => lineIndex !== index));
   }
@@ -201,6 +357,7 @@ export function TicketEntry({
     <div className="legacy-grid-2">
       <div className="space-y-5">
         <form action={action} className="space-y-5">
+          {mode === "edit" ? <input name="ticketId" type="hidden" value={ticketId ?? ""} /> : null}
           <input
             name="linesJson"
             type="hidden"
@@ -213,20 +370,34 @@ export function TicketEntry({
             </div>
             <div className="panel-body">
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="legacy-form-label" htmlFor="drawId">
-                    งวด
-                  </label>
-                  <Select id="drawId" name="drawId" value={selectedDrawId} onChange={(event) => setSelectedDrawId(event.target.value)} required>
-                    {draws.map((draw) => (
-                      <option key={draw.id} value={draw.id}>
-                        {draw.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                {mode === "edit" ? (
+                  <div>
+                    <input name="drawId" type="hidden" value={selectedDrawId} />
+                    <div className="legacy-form-label">งวด</div>
+                    <div className="legacy-form-control bg-muted/40">{selectedDraw?.name ?? "-"}</div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="legacy-form-label" htmlFor="drawId">
+                      งวด
+                    </label>
+                    <Select id="drawId" name="drawId" value={selectedDrawId} onChange={(event) => setSelectedDrawId(event.target.value)} required>
+                      {draws.map((draw) => (
+                        <option key={draw.id} value={draw.id}>
+                          {draw.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
 
-                {role !== "CUSTOMER" ? (
+                {mode === "edit" ? (
+                  <div>
+                    <input name="customerId" type="hidden" value={selectedCustomerId} />
+                    <div className="legacy-form-label">ลูกค้า</div>
+                    <div className="legacy-form-control bg-muted/40">{selectedCustomer?.name ?? "-"}</div>
+                  </div>
+                ) : role !== "CUSTOMER" ? (
                   <div>
                     <label className="legacy-form-label" htmlFor="customerId">
                       ลูกค้า
@@ -240,7 +411,7 @@ export function TicketEntry({
                     >
                       {customers.map((customer) => (
                         <option key={customer.id} value={customer.id}>
-                          {customer.code} : {customer.name}
+                          {customer.name}
                         </option>
                       ))}
                     </Select>
@@ -251,13 +422,180 @@ export function TicketEntry({
               </div>
             </div>
           </div>
-
           <div className="panel">
             <div className="panel-header">
-              <div>
-                <h2 className="text-lg font-medium">คีย์ตามฟอร์แมต PHP</h2>
-                <p className="text-xs text-muted-foreground">ใช้รูปแบบ `บ:` `ล:` หรือ `บล:` แล้วตรวจสอบก่อนบันทึก</p>
+              <h2 className="text-lg font-medium">เลือกโหมดคีย์</h2>
+            </div>
+            <div className="panel-body space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                {entryModeOptions.map((mode) => (
+                  <button
+                    key={mode.key}
+                    className={`rounded-sm border px-4 py-3 text-left transition ${
+                      entryMode === mode.key
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
+                    }`}
+                    onClick={() => setEntryMode(mode.key)}
+                    type="button"
+                  >
+                    <div className="text-sm font-medium">{mode.label}</div>
+                  </button>
+                ))}
               </div>
+            </div>
+          </div>
+
+          {entryMode === "HELPER" ? (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="text-lg font-medium">Tool ช่วยคีย์</h2>
+            </div>
+            <div className="panel-body space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {helperTypes.map((type) => (
+                  <Button
+                    key={type.key}
+                    onClick={() => {
+                      setHelperType(type.key);
+                      setHelperNumber((current) => normalizeHelperNumber(current, type.key));
+                      setHelperError("");
+                      helperNumberRef.current?.focus();
+                    }}
+                    type="button"
+                    variant={helperType === type.key ? "secondary" : "outline"}
+                  >
+                    {type.label}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)_220px_auto]">
+                <div className="flex items-center rounded-sm border border-border bg-muted/30 px-4 text-sm font-medium">
+                  {helperConfig.label}
+                </div>
+                <Input
+                  ref={helperNumberRef}
+                  inputMode="numeric"
+                  maxLength={helperConfig.digits}
+                  placeholder={`เลข ${helperConfig.digits} หลัก`}
+                  value={helperNumber}
+                  onChange={(event) => {
+                    setHelperNumber(normalizeHelperNumber(event.target.value, helperType));
+                    setHelperError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addHelperLine();
+                    }
+                  }}
+                />
+                <Input
+                  inputMode="decimal"
+                  placeholder="จำนวนเงิน"
+                  value={helperAmount}
+                  onChange={(event) => {
+                    setHelperAmount(event.target.value);
+                    setHelperError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addHelperLine();
+                    }
+                  }}
+                />
+                <Button onClick={addHelperLine} type="button">
+                  เพิ่มเข้าโพย
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {helperAmountPresets.map((preset) => (
+                  <Button
+                    key={preset}
+                    onClick={() => {
+                      setHelperAmount(String(preset));
+                      setHelperError("");
+                      helperNumberRef.current?.focus();
+                    }}
+                    type="button"
+                    variant={helperAmount === String(preset) ? "secondary" : "outline"}
+                  >
+                    {formatCurrency(preset)}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="rounded-sm border border-border bg-muted/40 px-4 py-3 text-xs leading-6 text-muted-foreground">
+                <div>{helperPreview || "-"}</div>
+              </div>
+
+              {helperError ? (
+                <div className="rounded-sm border border-[#ebccd1] bg-[#f2dede] px-4 py-3 text-sm text-[#a94442]">
+                  {helperError}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          ) : null}
+
+          {entryMode === "QUICK" ? (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="text-lg font-medium">คีย์ลัดแบบเร็ว</h2>
+            </div>
+            <div className="panel-body space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(quickModeLabels) as QuickEntryMode[]).map((mode) => (
+                  <Button
+                    key={mode}
+                    onClick={() => {
+                      setQuickMode(mode);
+                      setQuickError("");
+                    }}
+                    type="button"
+                    variant={quickMode === mode ? "secondary" : "outline"}
+                  >
+                    {quickModeLabels[mode]}
+                  </Button>
+                ))}
+              </div>
+
+              <Textarea
+                id="quick-ticket-input"
+                placeholder={quickModePlaceholders[quickMode]}
+                rows={8}
+                value={quickText}
+                onChange={(event) => setQuickText(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    parseQuickInput();
+                  }
+                }}
+              />
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={parseQuickInput} type="button">
+                  แปลงคีย์ลัด
+                </Button>
+              </div>
+
+              {quickError ? (
+                <div className="rounded-sm border border-[#ebccd1] bg-[#f2dede] px-4 py-3 text-sm text-[#a94442]">
+                  {quickError}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          ) : null}
+
+          {entryMode === "PHP" ? (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="text-lg font-medium">คีย์ตามฟอร์แมต PHP</h2>
             </div>
             <div className="panel-body space-y-4">
               <Textarea
@@ -268,20 +606,10 @@ export function TicketEntry({
                 onChange={(event) => setRawText(event.target.value)}
               />
 
-              <div className="rounded-sm border border-border bg-muted/40 px-4 py-3 text-xs leading-6 text-muted-foreground">
-                <div>`บ:00=200` = 2 ตัวบน</div>
-                <div>`ล:01=200*200` = 2 ตัวล่าง + กลับเลข</div>
-                <div>`บ:001*=150` = 3 ตัวบนสลับ</div>
-                <div>`บ:103=500*500` = 3 ตัวบน + 3 โต๊ด</div>
-                <div>`บ:24=*200` = คู่โต๊ด</div>
-                <div>`บ:5=5000` = ลอยบน, `ล:6=500` = ลอยล่าง</div>
-              </div>
-
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={parseLegacyInput} type="button" variant="secondary">
                   ตรวจสอบและแยกรายการ
                 </Button>
-                <span className="text-xs text-muted-foreground">หลังตรวจสอบแล้วระบบจะใช้รายการนี้เป็นชุดสำหรับบันทึกโพย</span>
               </div>
 
               {parseError ? (
@@ -291,6 +619,7 @@ export function TicketEntry({
               ) : null}
             </div>
           </div>
+          ) : null}
 
           <div className="panel">
             <div className="panel-header">
@@ -339,12 +668,15 @@ export function TicketEntry({
               <h2 className="text-lg font-medium">หมายเหตุ</h2>
             </div>
             <div className="panel-body">
-              <Textarea id="note" name="note" placeholder="หมายเหตุเพิ่มเติมในบิล" />
+              <Textarea defaultValue={initialNote ?? ""} id="note" name="note" placeholder="หมายเหตุเพิ่มเติมในบิล" />
             </div>
           </div>
 
           <div className="flex justify-end">
-            <FormSubmit idleLabel="ยืนยันบันทึกโพย" pendingLabel="กำลังบันทึกโพย..." />
+            <FormSubmit
+              idleLabel={mode === "edit" ? "ยืนยันแก้ไขโพย" : "ยืนยันบันทึกโพย"}
+              pendingLabel={mode === "edit" ? "กำลังแก้ไขโพย..." : "กำลังบันทึกโพย..."}
+            />
           </div>
         </form>
       </div>
@@ -362,7 +694,7 @@ export function TicketEntry({
             <div>
               <div className="text-sm font-medium">ลูกค้า</div>
               <div className="text-sm text-muted-foreground">
-                {selectedCustomer ? `${selectedCustomer.code} : ${selectedCustomer.name}` : "-"}
+                {selectedCustomer?.name ?? "-"}
               </div>
             </div>
             <div>
@@ -424,7 +756,7 @@ export function TicketEntry({
         onClose={() => setPreviewOpen(false)}
         open={previewOpen}
         size="lg"
-        title="พรีวิวรายการคีย์ตามฟอร์แมต PHP"
+        title="พรีวิวรายการ"
       >
         <div className="space-y-5">
           {previewGroups.map((group: PreviewGroup) => (

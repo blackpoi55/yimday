@@ -18,6 +18,8 @@ const defaultUserActionState: UserActionState = {
   message: "",
 };
 
+const SHARED_MEMBER_OWNER = "__ALL__";
+
 function extractCompatSettings(formData: FormData) {
   const keys = [
     "pay_1",
@@ -75,13 +77,24 @@ function resolveCustomerShape({
   if (parsedMemberType === MemberType.CLIENT_MEMBER) {
     return {
       memberType: MemberType.CLIENT_MEMBER,
+      isSharedMember: false,
       ownerAgentId: null,
       parentMemberId: rawParentMemberId || null,
     };
   }
 
+  if (sessionRole === Role.ADMIN && rawOwnerAgentId === SHARED_MEMBER_OWNER) {
+    return {
+      memberType: parsedMemberType,
+      isSharedMember: true,
+      ownerAgentId: null,
+      parentMemberId: null,
+    };
+  }
+
   return {
     memberType: parsedMemberType,
+    isSharedMember: false,
     ownerAgentId: sessionRole === Role.AGENT ? sessionUserId : rawOwnerAgentId || null,
     parentMemberId: null,
   };
@@ -114,7 +127,7 @@ export async function createUserAction(
       return { ok: false, message: "ไม่มีสิทธิ์สร้างผู้ดูแลระบบ" };
     }
 
-    const { memberType, ownerAgentId, parentMemberId } =
+    const { memberType, isSharedMember, ownerAgentId, parentMemberId } =
       role === Role.CUSTOMER
         ? resolveCustomerShape({
             sessionUserId: session.userId,
@@ -123,7 +136,7 @@ export async function createUserAction(
             requestedMemberType: rawMemberType,
             sessionRole: session.role,
           })
-        : { memberType: null, ownerAgentId: null, parentMemberId: null };
+        : { memberType: null, isSharedMember: false, ownerAgentId: null, parentMemberId: null };
 
     if (memberType === MemberType.CLIENT_MEMBER && !parentMemberId) {
       return { ok: false, message: "กรุณาเลือกหัวหน้าสาย" };
@@ -165,6 +178,7 @@ export async function createUserAction(
         role,
         "memberType",
         "isActive",
+        "isSharedMember",
         "ownerAgentId",
         "parentMemberId",
         "createdAt",
@@ -181,6 +195,7 @@ export async function createUserAction(
         ${role}::"Role",
         ${memberType}::"MemberType",
         ${true},
+        ${isSharedMember},
         ${ownerAgentId},
         ${parentMemberId},
         ${now},
@@ -274,7 +289,7 @@ export async function updateUserProfileAction(
       return { ok: false, message: "Username นี้ถูกใช้งานแล้ว" };
     }
 
-    const { memberType, ownerAgentId, parentMemberId } =
+    const { memberType, isSharedMember, ownerAgentId, parentMemberId } =
       user.role === Role.CUSTOMER
         ? resolveCustomerShape({
             sessionUserId: "admin",
@@ -283,7 +298,7 @@ export async function updateUserProfileAction(
             requestedMemberType: rawMemberType || user.memberType || MemberType.MEMBER,
             sessionRole: Role.ADMIN,
           })
-        : { memberType: null, ownerAgentId: null, parentMemberId: null };
+        : { memberType: null, isSharedMember: false, ownerAgentId: null, parentMemberId: null };
 
     if (memberType === MemberType.CLIENT_MEMBER && !parentMemberId) {
       return { ok: false, message: "กรุณาเลือกหัวหน้าสาย" };
@@ -300,6 +315,7 @@ export async function updateUserProfileAction(
           name = ${name},
           username = ${username},
           phone = ${phone || null},
+          "isSharedMember" = ${isSharedMember},
           "ownerAgentId" = ${ownerAgentId},
           "parentMemberId" = ${parentMemberId},
           "memberType" = ${memberType}::"MemberType",
@@ -315,6 +331,7 @@ export async function updateUserProfileAction(
           name = ${name},
           username = ${username},
           phone = ${phone || null},
+          "isSharedMember" = ${isSharedMember},
           "ownerAgentId" = ${ownerAgentId},
           "parentMemberId" = ${parentMemberId},
           "memberType" = ${memberType}::"MemberType",

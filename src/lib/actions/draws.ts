@@ -269,6 +269,7 @@ export async function saveDrawResultAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/results");
+  revalidatePath("/dashboard/winners");
   revalidatePath("/dashboard/tickets");
   revalidatePath("/dashboard/draws");
 }

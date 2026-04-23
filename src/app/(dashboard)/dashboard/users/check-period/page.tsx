@@ -14,6 +14,7 @@ export default async function CheckPeriodPage({ searchParams }: CheckPeriodPageP
   const session = await requireSession([Role.ADMIN, Role.AGENT]);
   const resolvedSearchParams = (await searchParams) ?? {};
   const customerId = resolvedSearchParams.customerId;
+  const now = new Date();
 
   if (!customerId) {
     redirect("/dashboard/users?error=member-not-found");
@@ -39,6 +40,12 @@ export default async function CheckPeriodPage({ searchParams }: CheckPeriodPageP
     prisma.draw.findFirst({
       where: {
         status: "OPEN",
+        openAt: {
+          lte: now,
+        },
+        closeAt: {
+          gte: now,
+        },
       },
       orderBy: {
         closeAt: "asc",

@@ -33,6 +33,7 @@ type UserRow = {
   phone: string | null;
   role: Role;
   memberType: MemberType | null;
+  isSharedMember: boolean;
   ownerAgentId: string | null;
   parentMemberId?: string | null;
   managerName: string;
@@ -43,6 +44,7 @@ type UsersPageClientProps = {
   selectedTab: "member" | "client" | "staff";
   users: UserRow[];
   mainMembers: UserOption[];
+  agents: UserOption[];
   defaultCompatSettings: UserCompatSettings;
   userSettings: Record<string, UserCompatSettings>;
 };
@@ -68,6 +70,8 @@ const MEMBER_TYPE = {
   MAIN_MEMBER: "MAIN_MEMBER",
   CLIENT_MEMBER: "CLIENT_MEMBER",
 } as const satisfies Record<string, MemberType>;
+
+const SHARED_MEMBER_OWNER = "__ALL__";
 
 function getTabMeta(tab: "member" | "client" | "staff") {
   switch (tab) {
@@ -144,6 +148,33 @@ function getMemberTypeLabel(memberType: MemberType | null) {
   }
 }
 
+function getOwnerDefaultValue(user: UserRow) {
+  if (user.isSharedMember) {
+    return SHARED_MEMBER_OWNER;
+  }
+
+  return user.ownerAgentId ?? "";
+}
+
+function renderOwnerAgentSelect(agents: UserOption[], defaultValue = "") {
+  return (
+    <div>
+      <label className="legacy-form-label" htmlFor="ownerAgentId">
+        พนักงานที่ดูแล
+      </label>
+      <Select defaultValue={defaultValue} id="ownerAgentId" name="ownerAgentId">
+        <option value="">ไม่ระบุ</option>
+        <option value={SHARED_MEMBER_OWNER}>ทุกคน</option>
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.name}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
 function getPasswordValidationMessage(form: HTMLFormElement) {
   const password = (form.elements.namedItem("password") as HTMLInputElement | null)?.value.trim() ?? "";
   const confirmPassword = (form.elements.namedItem("confirmPassword") as HTMLInputElement | null)?.value.trim() ?? "";
@@ -188,10 +219,12 @@ async function validatePasswordBeforeSubmit(event: FormEvent<HTMLFormElement>, s
 function AddUserForm({
   selectedTab,
   mainMembers,
+  agents,
   onSuccess,
 }: {
   selectedTab: "member" | "client" | "staff";
   mainMembers: UserOption[];
+  agents: UserOption[];
   onSuccess: () => void;
 }) {
   const [state, formAction] = useActionState(createUserAction, initialActionState);
@@ -259,6 +292,7 @@ function AddUserForm({
               </Select>
             </div>
           ) : null}
+          {selectedTab === "member" ? renderOwnerAgentSelect(agents) : null}
           <div>
             <label className="legacy-form-label" htmlFor="name">
               Name
@@ -299,12 +333,14 @@ function EditUserForm({
   selectedTab,
   editingUser,
   mainMembers,
+  agents,
   settings,
   onSuccess,
 }: {
   selectedTab: "member" | "client" | "staff";
   editingUser: UserRow;
   mainMembers: UserOption[];
+  agents: UserOption[];
   settings?: UserCompatSettings;
   onSuccess: () => void;
 }) {
@@ -378,6 +414,7 @@ function EditUserForm({
               </Select>
             </div>
           ) : null}
+          {selectedTab === "member" ? renderOwnerAgentSelect(agents, getOwnerDefaultValue(editingUser)) : null}
           <div>
             <label className="legacy-form-label" htmlFor={`edit-name-${editingUser.id}`}>
               Name
@@ -414,7 +451,7 @@ function EditUserForm({
   );
 }
 
-export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompatSettings, userSettings }: UsersPageClientProps) {
+export function UsersPageClient({ selectedTab, users, mainMembers, agents, defaultCompatSettings, userSettings }: UsersPageClientProps) {
   const [modal, setModal] = useState<null | { type: "add" } | { type: "edit"; userId: string }>(null);
   const editingUser = useMemo(
     () => (modal?.type === "edit" ? users.find((user) => user.id === modal.userId) ?? null : null),
@@ -454,6 +491,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompat
               <th>ชื่อ</th>
               {selectedTab === "client" ? <th>หัวหน้าสาย</th> : <th>username</th>}
               {selectedTab === "member" ? <th>ประเภทสมาชิก</th> : null}
+              {selectedTab === "member" ? <th>พนักงาน</th> : null}
               {selectedTab !== "client" ? <th>password</th> : null}
               <th>สถานะการใช้งาน</th>
               <th>แก้ไข</th>
@@ -466,6 +504,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompat
                 <td>{user.name}</td>
                 {selectedTab === "client" ? <td>{user.managerName}</td> : <td>{user.tableUsername ?? user.username}</td>}
                 {selectedTab === "member" ? <td>{getMemberTypeLabel(user.memberType)}</td> : null}
+                {selectedTab === "member" ? <td>{user.isSharedMember ? "ทุกคน" : user.managerName}</td> : null}
                 {selectedTab !== "client" ? <td>{user.tablePassword ?? user.passwordPlain ?? "****"}</td> : null}
                 <td>
                   <form action={toggleUserActiveAction}>
@@ -485,7 +524,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompat
             ))}
             {users.length === 0 ? (
               <tr>
-                <td colSpan={selectedTab === "client" ? 5 : selectedTab === "member" ? 7 : 6}>ยังไม่มีข้อมูล</td>
+                <td colSpan={selectedTab === "client" ? 5 : selectedTab === "member" ? 8 : 6}>ยังไม่มีข้อมูล</td>
               </tr>
             ) : null}
           </tbody>
@@ -493,7 +532,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompat
       </div>
 
       <LegacyModal open={modal?.type === "add"} onClose={() => setModal(null)} title={tabMeta.addTitle} size={selectedTab === "member" ? "lg" : "md"}>
-        <AddUserForm mainMembers={mainMembers} onSuccess={() => setModal(null)} selectedTab={selectedTab} />
+        <AddUserForm agents={agents} mainMembers={mainMembers} onSuccess={() => setModal(null)} selectedTab={selectedTab} />
       </LegacyModal>
 
       <LegacyModal
@@ -505,6 +544,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, defaultCompat
         {editingUser ? (
           <EditUserForm
             editingUser={editingUser}
+            agents={agents}
             mainMembers={mainMembers}
             onSuccess={() => setModal(null)}
             selectedTab={selectedTab}

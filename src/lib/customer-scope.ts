@@ -5,7 +5,13 @@ export function buildAgentCustomerWhere(agentId: string): Prisma.UserWhereInput 
     role: Role.CUSTOMER,
     isActive: true,
     OR: [
+      { isSharedMember: true },
       { ownerAgentId: agentId },
+      {
+        isSharedMember: false,
+        ownerAgentId: null,
+        parentMemberId: null,
+      },
       {
         Ticket_Ticket_customerIdToUser: {
           some: {
@@ -15,7 +21,19 @@ export function buildAgentCustomerWhere(agentId: string): Prisma.UserWhereInput 
       },
       {
         ParentMember: {
+          isSharedMember: true,
+        },
+      },
+      {
+        ParentMember: {
           ownerAgentId: agentId,
+        },
+      },
+      {
+        ParentMember: {
+          isSharedMember: false,
+          ownerAgentId: null,
+          parentMemberId: null,
         },
       },
       {

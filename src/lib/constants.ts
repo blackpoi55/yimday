@@ -88,6 +88,7 @@ export const navigationItems = [
   { href: "/dashboard", label: "หน้าหลัก", roles: [Role.ADMIN, Role.AGENT, Role.CUSTOMER] },
   { href: "/dashboard/draws", label: "เปิดงวด", roles: [Role.ADMIN] },
   { href: "/dashboard/results", label: "ปิดงวด", roles: [Role.ADMIN] },
+  { href: "/dashboard/winners", label: "ตรวจหวย", roles: [Role.ADMIN, Role.AGENT] },
   { href: "/dashboard/tickets", label: "ดูโพย", roles: [Role.ADMIN, Role.AGENT, Role.CUSTOMER] },
   { href: "/dashboard/realtime", label: "เรียลไทม์", roles: [Role.ADMIN] },
   { href: "/dashboard/limits", label: "เลขอั้น/เต็ม", roles: [Role.ADMIN] },

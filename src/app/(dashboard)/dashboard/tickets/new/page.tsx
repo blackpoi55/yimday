@@ -22,11 +22,18 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
   const requestedCustomerId = resolvedSearchParams.customerId;
   const requestedDrawId = resolvedSearchParams.drawId;
   const ticketRole = session.role === Role.ADMIN ? "ADMIN" : session.role === Role.AGENT ? "AGENT" : "CUSTOMER";
+  const now = new Date();
 
   const [draws, customers, payoutProfiles] = await Promise.all([
     prisma.draw.findMany({
       where: {
         status: "OPEN",
+        openAt: {
+          lte: now,
+        },
+        closeAt: {
+          gte: now,
+        },
       },
       include: {
         BetRate: true,
@@ -69,7 +76,6 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
   const serializedCustomers = customers.map((customer) => ({
     id: customer.id,
     name: customer.name,
-    code: customer.code,
     role: customer.role,
   }));
 
@@ -97,7 +103,6 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
       <section className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="legacy-title">คีย์โพย</h1>
-          <p className="legacy-subtitle">จัดหน้าและ flow ให้ใกล้กับ `member_adddata.php` มากที่สุดในโครง App Router ปัจจุบัน</p>
         </div>
         <Link href="/dashboard/tickets">
           <Button variant="outline">กลับไปหน้าบิล</Button>

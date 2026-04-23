@@ -129,6 +129,7 @@ model User {
   role                           Role
   memberType                     MemberType?
   isActive                       Boolean  @default(true)
+  isSharedMember                 Boolean  @default(false)
   ownerAgentId                   String?
   parentMemberId                 String?
   createdAt                      DateTime @default(now())
@@ -145,6 +146,7 @@ model User {
 
   @@index([ownerAgentId])
   @@index([parentMemberId])
+  @@index([isSharedMember])
   @@index([role])
 }
 

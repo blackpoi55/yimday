@@ -10,6 +10,7 @@ import {
 } from "@/lib/bet-utils";
 import { requireSession } from "@/lib/auth";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
+import { isDrawAcceptingTickets } from "@/lib/draw-window";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
 import { compatSettingsToCommissionEntries } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
@@ -22,6 +23,46 @@ export type TicketActionState = {
   message?: string;
   redirectTo?: string;
 };
+
+async function parseAndValidateLines(linesJson: string) {
+  let rawLines: TicketLineInput[] = [];
+
+  try {
+    rawLines = JSON.parse(linesJson) as TicketLineInput[];
+  } catch {
+    return { error: "ข้อมูลรายการโพยไม่ถูกต้อง" } as const;
+  }
+
+  if (!Array.isArray(rawLines) || rawLines.length === 0) {
+    return { error: "ยังไม่มีรายการโพย" } as const;
+  }
+
+  const lines = rawLines.map((line) => ({
+    betType: line.betType,
+    number: normalizeNumber(line.number, line.betType),
+    amount: Number(line.amount),
+  }));
+
+  const blockedNumbers = await import("@/lib/php-compat-store").then((mod) => mod.getBlockedNumbers());
+
+  for (const line of lines) {
+    const lineError = validateLine(line);
+    if (lineError) {
+      return { error: lineError } as const;
+    }
+
+    if (
+      (line.betType === "TWO_TOP" && blockedNumbers.twoTop.includes(line.number)) ||
+      (line.betType === "TWO_BOTTOM" && blockedNumbers.twoBottom.includes(line.number)) ||
+      (line.betType === "THREE_STRAIGHT" && blockedNumbers.threeTop.includes(line.number)) ||
+      (line.betType === "THREE_BOTTOM" && blockedNumbers.threeBottom.includes(line.number))
+    ) {
+      return { error: `เลข ${line.number} ถูกตั้งเป็นเลขเต็มแล้ว` } as const;
+    }
+  }
+
+  return { lines } as const;
+}
 
 export async function createTicketAction(
   _prevState: TicketActionState,
@@ -37,41 +78,13 @@ export async function createTicketAction(
     return { error: "กรุณาเลือกงวดและเพิ่มรายการคีย์โพย" };
   }
 
-  let rawLines: TicketLineInput[] = [];
+  const parsed = await parseAndValidateLines(linesJson);
 
-  try {
-    rawLines = JSON.parse(linesJson) as TicketLineInput[];
-  } catch {
-    return { error: "ข้อมูลรายการโพยไม่ถูกต้อง" };
+  if ("error" in parsed) {
+    return { error: parsed.error };
   }
 
-  if (!Array.isArray(rawLines) || rawLines.length === 0) {
-    return { error: "ยังไม่มีรายการโพย" };
-  }
-
-  const lines = rawLines.map((line) => ({
-    betType: line.betType,
-    number: normalizeNumber(line.number, line.betType),
-    amount: Number(line.amount),
-  }));
-
-  const blockedNumbers = await import("@/lib/php-compat-store").then((mod) => mod.getBlockedNumbers());
-
-  for (const line of lines) {
-    const lineError = validateLine(line);
-    if (lineError) {
-      return { error: lineError };
-    }
-
-    if (
-      (line.betType === "TWO_TOP" && blockedNumbers.twoTop.includes(line.number)) ||
-      (line.betType === "TWO_BOTTOM" && blockedNumbers.twoBottom.includes(line.number)) ||
-      (line.betType === "THREE_STRAIGHT" && blockedNumbers.threeTop.includes(line.number)) ||
-      (line.betType === "THREE_BOTTOM" && blockedNumbers.threeBottom.includes(line.number))
-    ) {
-      return { error: `เลข ${line.number} ถูกตั้งเป็นเลขเต็มแล้ว` };
-    }
-  }
+  const { lines } = parsed;
 
   const draw = await prisma.draw.findUnique({
     where: { id: drawId },
@@ -82,8 +95,8 @@ export async function createTicketAction(
     return { error: "ไม่พบงวดที่เลือก" };
   }
 
-  if (draw.status !== "OPEN") {
-    return { error: "งวดนี้ปิดรับโพยแล้ว" };
+  if (!isDrawAcceptingTickets(draw)) {
+    return { error: "งวดนี้ยังไม่อยู่ในช่วงรับโพย หรือปิดรับโพยแล้ว" };
   }
 
   let customerId = selectedCustomerId;
@@ -139,11 +152,11 @@ export async function createTicketAction(
       return { error: "ไม่พบข้อมูลลูกค้าที่เลือก" };
     }
 
-    if (!customer.ownerAgentId) {
+    if (!customer.ownerAgentId && !customer.isSharedMember) {
       return { error: "ลูกค้ารายนี้ยังไม่ได้ผูกกับพนักงาน จึงยังคีย์โพยแทนไม่ได้" };
     }
 
-    agentId = customer.ownerAgentId;
+    agentId = customer.ownerAgentId ?? session.userId;
     commissionRole = customer.role;
   }
 
@@ -203,5 +216,125 @@ export async function createTicketAction(
     ok: true,
     message: "บันทึกโพยเรียบร้อย",
     redirectTo: "/dashboard/tickets",
+  };
+}
+
+export async function updateTicketAction(
+  _prevState: TicketActionState,
+  formData: FormData,
+): Promise<TicketActionState> {
+  const session = await requireSession([Role.ADMIN, Role.AGENT]);
+  const ticketId = getString(formData.get("ticketId"));
+  const note = getString(formData.get("note"));
+  const linesJson = getString(formData.get("linesJson"));
+
+  if (!ticketId || !linesJson) {
+    return { error: "ข้อมูลโพยไม่ครบ" };
+  }
+
+  const parsed = await parseAndValidateLines(linesJson);
+
+  if ("error" in parsed) {
+    return { error: parsed.error };
+  }
+
+  const ticket = await prisma.ticket.findFirst({
+    where:
+      session.role === Role.ADMIN
+        ? { id: ticketId }
+        : {
+            id: ticketId,
+            agentId: session.userId,
+          },
+    include: {
+      Draw: {
+        include: {
+          BetRate: true,
+        },
+      },
+      User_Ticket_customerIdToUser: true,
+    },
+  });
+
+  if (!ticket) {
+    return { error: "ไม่พบโพยที่ต้องการแก้ไข" };
+  }
+
+  if (!isDrawAcceptingTickets(ticket.Draw)) {
+    return { error: "งวดนี้ยังไม่อยู่ในช่วงรับโพย หรือปิดรับโพยแล้ว จึงแก้โพยไม่ได้" };
+  }
+
+  if (ticket.status !== TicketStatus.CONFIRMED) {
+    return { error: "แก้ไขได้เฉพาะโพยที่ยืนยันแล้วเท่านั้น" };
+  }
+
+  const commissionRole = ticket.User_Ticket_customerIdToUser.role;
+  const payoutProfiles = await getPayoutProfiles(commissionRole);
+  const customerCompatSettings = await getUserCompatSettings(ticket.customerId);
+  const effectiveProfiles = [
+    ...payoutProfiles.map((item) => ({
+      role: item.role,
+      betType: item.betType,
+      commission: Number(item.commission),
+    })),
+    ...compatSettingsToCommissionEntries(customerCompatSettings, commissionRole),
+  ];
+  const totals = calculateTicketTotals(parsed.lines, ticket.Draw.BetRate, effectiveProfiles, commissionRole);
+  const now = new Date();
+
+  try {
+    await prisma.$transaction([
+      prisma.betItem.deleteMany({
+        where: {
+          ticketId,
+        },
+      }),
+      prisma.ticket.update({
+        where: {
+          id: ticketId,
+        },
+        data: {
+          note: note || null,
+          subtotal: totals.subtotal,
+          discount: totals.discount,
+          total: totals.total,
+          winAmount: 0,
+          settledAt: null,
+          updatedAt: now,
+          BetItem: {
+            create: parsed.lines.map((line) => {
+              const rate = ticket.Draw.BetRate.find((item) => item.betType === line.betType);
+
+              if (!rate?.isOpen) {
+                throw new Error(`ประเภท ${line.betType} ปิดรับแล้ว`);
+              }
+
+              return {
+                id: crypto.randomUUID(),
+                betType: line.betType,
+                number: line.number,
+                amount: line.amount,
+                payoutRate: rate.payout,
+              };
+            }),
+          },
+        },
+      }),
+    ]);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "ไม่สามารถแก้ไขโพยได้",
+    };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tickets");
+  revalidatePath(`/dashboard/tickets/${ticketId}`);
+  revalidatePath(`/dashboard/users/${ticket.customerId}`);
+
+  return {
+    ok: true,
+    message: "แก้ไขโพยเรียบร้อย",
+    redirectTo: `/dashboard/users/${ticket.customerId}?ticketId=${ticketId}`,
   };
 }

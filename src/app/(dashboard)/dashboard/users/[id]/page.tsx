@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { betTypeLabels } from "@/lib/constants";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
+import { isDrawAcceptingTickets } from "@/lib/draw-window";
 import { roleLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { buildTicketDisplayNameMap, getTicketDisplayName, sortByTicketDisplayName } from "@/lib/ticket-display";
@@ -69,6 +70,7 @@ function AgentHistoryPage({
     (selectedTicketId
       ? orderedTickets.find((ticket) => ticket.id === selectedTicketId)
       : null) ?? null;
+  const selectedTicketCanEdit = selectedTicket ? isDrawAcceptingTickets(selectedTicket.Draw) : false;
 
   const groupedDraws = orderedTickets.reduce<
     Array<{
@@ -103,7 +105,16 @@ function AgentHistoryPage({
           {selectedTicket ? (
             <div className="space-y-4">
               <div className="rounded-sm border border-border px-4 py-4">
-                <div className="text-base font-medium">{getTicketDisplayName(selectedTicket.id, ticketDisplayNames, selectedTicket.code)}</div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-base font-medium">{getTicketDisplayName(selectedTicket.id, ticketDisplayNames, selectedTicket.code)}</div>
+                  {selectedTicketCanEdit ? (
+                    <Link href={`/dashboard/tickets/${selectedTicket.id}/edit`}>
+                      <Button size="sm">แก้ไขโพย</Button>
+                    </Link>
+                  ) : (
+                    <span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">ปิดแก้ไขแล้ว</span>
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground">
                   {selectedTicket.Draw.name} | {formatDateTime(selectedTicket.createdAt)}
                 </div>
@@ -213,7 +224,9 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         <div>
           <h1 className="legacy-title">{user.name}</h1>
           <p className="legacy-subtitle">
-            {roleLabels[user.role]} | {user.username} | ผู้ดูแล {user.User?.name ?? "-"}
+            {user.role === Role.CUSTOMER
+              ? `${roleLabels[user.role]} | ผู้ดูแล ${user.User?.name ?? "-"}`
+              : `${roleLabels[user.role]} | ${user.username} | ผู้ดูแล ${user.User?.name ?? "-"}`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -235,10 +248,12 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
             <div className="table-shell">
               <table>
                 <tbody>
-                  <tr>
-                    <th>รหัส</th>
-                    <td>{user.code}</td>
-                  </tr>
+                  {user.role !== Role.CUSTOMER ? (
+                    <tr>
+                      <th>รหัส</th>
+                      <td>{user.code}</td>
+                    </tr>
+                  ) : null}
                   <tr>
                     <th>โทรศัพท์</th>
                     <td>{user.phone ?? "-"}</td>
