@@ -3,12 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, Clock3, Flame, RefreshCcw } from "lucide-react";
+import { Activity, AlertTriangle, Clock3, Flame, RefreshCcw, Ticket, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 type DrawOption = {
   id: string;
   name: string;
+  closeAt: string;
+  status: string;
+};
+
+type SelectedDraw = {
+  id: string;
+  name: string;
+  closeAt: string;
+  openAt: string;
+  status: string;
 };
 
 type RedSummary = {
@@ -44,6 +54,7 @@ type NearLimitItem = {
 
 type RecentRow = {
   id: string;
+  ticketId: string;
   betType: string;
   label: string;
   number: string;
@@ -54,14 +65,45 @@ type RecentRow = {
   createdAt: string;
 };
 
+type ExposureSummary = {
+  itemCount: number;
+  ticketCount: number;
+  total: number;
+};
+
+type AgentSummary = ExposureSummary & {
+  agentId: string;
+  agentName: string;
+};
+
+type CustomerSummary = ExposureSummary & {
+  customerId: string;
+  customerName: string;
+};
+
+type AlertItem = {
+  tone: "danger" | "warning";
+  title: string;
+  detail: string;
+};
+
 type RealtimeMonitorClientProps = {
   draws: DrawOption[];
   selectedDrawId: string;
+  selectedDraw: SelectedDraw;
   updatedAt: string;
+  minutesToClose: number;
+  totalActiveStake: number;
+  ticketCount: number;
+  customerCount: number;
+  agentCount: number;
   redCount: number;
   redTypeCount: number;
   redTotalStake: number;
   redTotalOver: number;
+  alertItems: AlertItem[];
+  agentSummaries: AgentSummary[];
+  customerSummaries: CustomerSummary[];
   summaryByType: RedSummary[];
   overLimit: RedItem[];
   nearLimit: NearLimitItem[];
@@ -73,14 +115,38 @@ function formatDateTimeValue(value: string) {
   return `${date.toLocaleDateString("sv-SE")} ${date.toLocaleTimeString("en-GB")}`;
 }
 
+function formatMinutes(minutes: number) {
+  if (minutes <= 0) {
+    return "ปิดรับแล้ว";
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${remainingMinutes} นาที`;
+  }
+
+  return `${hours} ชม. ${remainingMinutes} นาที`;
+}
+
 export function RealtimeMonitorClient({
   draws,
   selectedDrawId,
+  selectedDraw,
   updatedAt,
+  minutesToClose,
+  totalActiveStake,
+  ticketCount,
+  customerCount,
+  agentCount,
   redCount,
   redTypeCount,
   redTotalStake,
   redTotalOver,
+  alertItems,
+  agentSummaries,
+  customerSummaries,
   summaryByType,
   overLimit,
   nearLimit,
@@ -116,6 +182,7 @@ export function RealtimeMonitorClient({
   const hottestItem = overLimit[0] ?? null;
   const drawName = draws.find((draw) => draw.id === selectedDrawId)?.name ?? "-";
   const refreshLabel = useMemo(() => formatDateTimeValue(updatedAt), [updatedAt]);
+  const closeAtLabel = useMemo(() => formatDateTimeValue(selectedDraw.closeAt), [selectedDraw.closeAt]);
 
   return (
     <div className="space-y-6">
@@ -156,6 +223,59 @@ export function RealtimeMonitorClient({
         </div>
 
         <div className="panel-body space-y-6">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-[26px] border border-[#c7d2fe] bg-[linear-gradient(135deg,#eef2ff_0%,#f8fbff_52%,#ecfeff_100%)] p-5 shadow-[0_18px_44px_rgba(30,64,175,0.08)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium text-[#1d4ed8]">งวดที่กำลังเฝ้า</div>
+                  <div className="mt-1 text-2xl font-semibold text-[#0f172a]">{drawName}</div>
+                  <div className="mt-2 text-sm text-[#475569]">ปิดรับ {closeAtLabel}</div>
+                </div>
+                <div className={minutesToClose <= 30 ? "rounded-2xl bg-[#fee2e2] px-4 py-3 text-[#991b1b]" : "rounded-2xl bg-white/80 px-4 py-3 text-[#0f172a]"}>
+                  <div className="text-xs opacity-75">เหลือเวลา</div>
+                  <div className="text-xl font-semibold">{formatMinutes(minutesToClose)}</div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl bg-white/80 p-3">
+                  <div className="text-xs text-[#64748b]">ยอดรับคงเหลือ</div>
+                  <div className="mt-1 text-lg font-semibold text-[#0f172a]">{formatCurrency(totalActiveStake)}</div>
+                </div>
+                <div className="rounded-2xl bg-white/80 p-3">
+                  <div className="text-xs text-[#64748b]">โพย</div>
+                  <div className="mt-1 text-lg font-semibold text-[#0f172a]">{ticketCount}</div>
+                </div>
+                <div className="rounded-2xl bg-white/80 p-3">
+                  <div className="text-xs text-[#64748b]">ลูกค้า</div>
+                  <div className="mt-1 text-lg font-semibold text-[#0f172a]">{customerCount}</div>
+                </div>
+                <div className="rounded-2xl bg-white/80 p-3">
+                  <div className="text-xs text-[#64748b]">พนักงาน</div>
+                  <div className="mt-1 text-lg font-semibold text-[#0f172a]">{agentCount}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[26px] border border-[#fed7aa] bg-[#fff7ed] p-5 shadow-[0_18px_44px_rgba(234,88,12,0.08)]">
+              <div className="mb-3 flex items-center gap-2 text-[#9a3412]">
+                <AlertTriangle className="size-5" />
+                <h2 className="text-lg font-semibold">สิ่งที่ควรรีบดู</h2>
+              </div>
+              <div className="space-y-2">
+                {alertItems.map((item) => (
+                  <div key={`${item.title}-${item.detail}`} className={item.tone === "danger" ? "rounded-2xl bg-[#fee2e2] p-3 text-[#7f1d1d]" : "rounded-2xl bg-white/80 p-3 text-[#92400e]"}>
+                    <div className="font-semibold">{item.title}</div>
+                    <div className="text-sm opacity-80">{item.detail}</div>
+                  </div>
+                ))}
+                {alertItems.length === 0 ? (
+                  <div className="rounded-2xl bg-white/80 p-3 text-sm text-[#166534]">ยังไม่มีสัญญาณเร่งด่วนในงวดนี้</div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-[22px] border border-[#ffd9d6] bg-[linear-gradient(180deg,#fff7f7_0%,#fff1f1_100%)] p-5 shadow-[0_18px_40px_rgba(220,38,38,0.08)]">
               <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fee2e2] text-[#dc2626]">
@@ -190,6 +310,48 @@ export function RealtimeMonitorClient({
               <div className="mt-1 text-[30px] font-semibold leading-none text-[#4c1d95]">{formatCurrency(redTotalOver)}</div>
               {hottestItem ? <div className="mt-2 text-sm text-[#7c3aed]">หนักสุด {hottestItem.label} {hottestItem.number}</div> : null}
             </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="rounded-[22px] border border-[#e5edf5] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+              <div className="mb-4 flex items-center gap-2">
+                <Users className="size-5 text-[#155eef]" />
+                <h2 className="text-lg font-semibold text-[#0f172a]">พนักงานที่ยอดเข้าเยอะสุด</h2>
+              </div>
+              <div className="space-y-3">
+                {agentSummaries.map((item, index) => (
+                  <div key={item.agentId} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-[#f8fbff] p-3">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-semibold text-[#1d4ed8]">{index + 1}</div>
+                    <div>
+                      <div className="font-medium text-[#0f172a]">{item.agentName}</div>
+                      <div className="text-xs text-[#64748b]">{item.ticketCount} โพย | {item.itemCount} รายการ</div>
+                    </div>
+                    <div className="font-semibold text-[#0f172a]">{formatCurrency(item.total)}</div>
+                  </div>
+                ))}
+                {agentSummaries.length === 0 ? <div className="text-sm text-muted-foreground">ยังไม่มีรายการจากพนักงาน</div> : null}
+              </div>
+            </section>
+
+            <section className="rounded-[22px] border border-[#e5edf5] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+              <div className="mb-4 flex items-center gap-2">
+                <Ticket className="size-5 text-[#16a34a]" />
+                <h2 className="text-lg font-semibold text-[#0f172a]">ลูกค้าที่มียอดสูงสุด</h2>
+              </div>
+              <div className="space-y-3">
+                {customerSummaries.map((item, index) => (
+                  <div key={item.customerId} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-[#f8fff9] p-3">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-[#dcfce7] text-sm font-semibold text-[#15803d]">{index + 1}</div>
+                    <div>
+                      <div className="font-medium text-[#0f172a]">{item.customerName}</div>
+                      <div className="text-xs text-[#64748b]">{item.ticketCount} โพย | {item.itemCount} รายการ</div>
+                    </div>
+                    <div className="font-semibold text-[#0f172a]">{formatCurrency(item.total)}</div>
+                  </div>
+                ))}
+                {customerSummaries.length === 0 ? <div className="text-sm text-muted-foreground">ยังไม่มีรายการจากลูกค้า</div> : null}
+              </div>
+            </section>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">
@@ -334,6 +496,9 @@ export function RealtimeMonitorClient({
                       </div>
                     </div>
                     <div className="mt-3 text-sm text-[#475569]">
+                      <Link className="mr-2 text-primary underline" href={`/dashboard/tickets/${row.ticketId}`}>
+                        เปิดโพย
+                      </Link>
                       {row.customerName} • {row.ticketName} • {row.agentName}
                     </div>
                   </div>

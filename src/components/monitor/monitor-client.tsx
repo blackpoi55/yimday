@@ -27,6 +27,7 @@ type OverLimitItem = {
 
 type DetailRow = {
   id: string;
+  ticketId: string;
   betType: string;
   number: string;
   amount: number;
@@ -742,7 +743,11 @@ export function MonitorClient({
                       <td>{formatCurrency(row.amount)}</td>
                       {splitAmount ? <td>{formatCurrency(splitPlanById.get(row.id) ?? 0)}</td> : null}
                       <td>{row.customerName}</td>
-                      <td>{row.ticketName}</td>
+                      <td>
+                        <Link className="text-primary underline" href={`/dashboard/tickets/${row.ticketId}`}>
+                          {row.ticketName}
+                        </Link>
+                      </td>
                       <td>{row.agentName}</td>
                       <td>{formatLegacyTicketEntry({ betType: row.betType, number: row.number, amount: row.amount, activeType })}</td>
                       <td>{createdAt.toLocaleDateString("sv-SE")}</td>

@@ -5,6 +5,9 @@ import { toNumber } from "@/lib/utils";
 
 export type MonitorDetailRow = {
   id: string;
+  ticketId: string;
+  customerId: string;
+  agentId: string;
   betType: string;
   number: string;
   amount: number;
@@ -24,8 +27,8 @@ export type MonitorOverLimitItem = {
 };
 
 export type MonitorSnapshot = {
-  draws: Array<{ id: string; name: string }>;
-  selectedDraw: { id: string; name: string };
+  draws: Array<{ id: string; name: string; closeAt: string; status: string }>;
+  selectedDraw: { id: string; name: string; closeAt: string; openAt: string; status: string };
   limitByType: Record<string, number | null>;
   totalsByType: Record<string, Record<string, number>>;
   threeTodTotals: Record<string, number>;
@@ -144,16 +147,26 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
   }).sort((a, b) => b.overBy - a.overBy);
 
   const ticketLabelMap = buildTicketDisplayNameMap(
-    activeBetItems.map((item) => ({
-      id: item.Ticket.id,
-      customerId: item.Ticket.customerId,
-      drawId: item.Ticket.drawId,
-      createdAt: item.Ticket.createdAt,
-    })),
+    Array.from(
+      new Map(
+        activeBetItems.map((item) => [
+          item.Ticket.id,
+          {
+            id: item.Ticket.id,
+            customerId: item.Ticket.customerId,
+            drawId: item.Ticket.drawId,
+            createdAt: item.Ticket.createdAt,
+          },
+        ]),
+      ).values(),
+    ),
   );
 
   const detailRows = activeBetItems.map((item) => ({
     id: item.id,
+    ticketId: item.Ticket.id,
+    customerId: item.Ticket.customerId,
+    agentId: item.Ticket.agentId,
     betType: item.betType,
     number: item.number,
     amount: item.remainingAmount,
@@ -165,10 +178,13 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
   }));
 
   return {
-    draws: draws.map((draw) => ({ id: draw.id, name: draw.name })),
+    draws: draws.map((draw) => ({ id: draw.id, name: draw.name, closeAt: draw.closeAt.toISOString(), status: draw.status })),
     selectedDraw: {
       id: selectedDraw.id,
       name: selectedDraw.name,
+      closeAt: selectedDraw.closeAt.toISOString(),
+      openAt: selectedDraw.openAt.toISOString(),
+      status: selectedDraw.status,
     },
     limitByType,
     totalsByType,

@@ -52,6 +52,69 @@ export default async function RealtimePage({ searchParams }: RealtimePageProps) 
 
   const redTotalStake = snapshot.overLimit.reduce((sum, item) => sum + item.total, 0);
   const redTotalOver = snapshot.overLimit.reduce((sum, item) => sum + item.overBy, 0);
+  const totalActiveStake = snapshot.detailRows.reduce((sum, item) => sum + item.amount, 0);
+  const ticketCount = new Set(snapshot.detailRows.map((row) => row.ticketId)).size;
+  const customerCount = new Set(snapshot.detailRows.map((row) => row.customerId)).size;
+  const agentCount = new Set(snapshot.detailRows.map((row) => row.agentId)).size;
+  const closeAtTime = new Date(snapshot.selectedDraw.closeAt).getTime();
+  const snapshotTime = new Date(snapshot.updatedAt).getTime();
+  const minutesToClose = Math.max(0, Math.ceil((closeAtTime - snapshotTime) / 60000));
+
+  const agentSummaries = Object.values(
+    snapshot.detailRows.reduce<Record<string, { agentId: string; agentName: string; total: number; itemCount: number; tickets: Set<string> }>>(
+      (acc, row) => {
+        acc[row.agentId] ??= {
+          agentId: row.agentId,
+          agentName: row.agentName,
+          total: 0,
+          itemCount: 0,
+          tickets: new Set<string>(),
+        };
+        acc[row.agentId].total += row.amount;
+        acc[row.agentId].itemCount += 1;
+        acc[row.agentId].tickets.add(row.ticketId);
+        return acc;
+      },
+      {},
+    ),
+  )
+    .map((item) => ({
+      agentId: item.agentId,
+      agentName: item.agentName,
+      itemCount: item.itemCount,
+      ticketCount: item.tickets.size,
+      total: item.total,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  const customerSummaries = Object.values(
+    snapshot.detailRows.reduce<Record<string, { customerId: string; customerName: string; total: number; itemCount: number; tickets: Set<string> }>>(
+      (acc, row) => {
+        acc[row.customerId] ??= {
+          customerId: row.customerId,
+          customerName: row.customerName,
+          total: 0,
+          itemCount: 0,
+          tickets: new Set<string>(),
+        };
+        acc[row.customerId].total += row.amount;
+        acc[row.customerId].itemCount += 1;
+        acc[row.customerId].tickets.add(row.ticketId);
+        return acc;
+      },
+      {},
+    ),
+  )
+    .map((item) => ({
+      customerId: item.customerId,
+      customerName: item.customerName,
+      itemCount: item.itemCount,
+      ticketCount: item.tickets.size,
+      total: item.total,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
 
   const summaryByType = Object.values(
     snapshot.overLimit.reduce<
@@ -125,9 +188,35 @@ export default async function RealtimePage({ searchParams }: RealtimePageProps) 
     label: betTypeLabels[row.betType as BetType] ?? row.betType,
   }));
 
+  const alertItems = [
+    ...(snapshot.selectedDraw.status !== "OPEN"
+      ? [{ tone: "danger" as const, title: "งวดนี้ไม่ได้เปิดรับโพย", detail: "ตรวจสถานะงวดก่อนรับโพยเพิ่ม" }]
+      : []),
+    ...(minutesToClose <= 30
+      ? [{ tone: "danger" as const, title: `เหลือเวลาปิดรับ ${minutesToClose} นาที`, detail: "ควรตรวจตัวแดงและยอดเสี่ยงทันที" }]
+      : minutesToClose <= 120
+        ? [{ tone: "warning" as const, title: `ใกล้ปิดรับใน ${minutesToClose} นาที`, detail: "เริ่มเฝ้าตัวใกล้แดงและยอดเข้าใหม่" }]
+        : []),
+    ...(overLimit.length > 0
+      ? [{ tone: "danger" as const, title: `มีตัวแดง ${overLimit.length} รายการ`, detail: `ยอดเกินรวม ${redTotalOver.toLocaleString("th-TH")}` }]
+      : []),
+    ...(nearLimit.length > 0
+      ? [{ tone: "warning" as const, title: `มีตัวใกล้แดง ${nearLimit.length} รายการ`, detail: "เลขที่ใช้ลิมิตเกิน 80%" }]
+      : []),
+    ...(Object.values(snapshot.limitByType).every((value) => !value || value <= 0)
+      ? [{ tone: "warning" as const, title: "ยังไม่ได้ตั้งลิมิตเลขอั้น", detail: "หน้า realtime จะไม่สามารถเตือนตัวแดงได้ครบ" }]
+      : []),
+  ].slice(0, 5);
+
   return (
     <RealtimeMonitorClient
+      agentSummaries={agentSummaries}
+      alertItems={alertItems}
+      customerSummaries={customerSummaries}
       draws={snapshot.draws}
+      agentCount={agentCount}
+      customerCount={customerCount}
+      minutesToClose={minutesToClose}
       nearLimit={nearLimit}
       overLimit={overLimit}
       recentRows={recentRows}
@@ -135,8 +224,11 @@ export default async function RealtimePage({ searchParams }: RealtimePageProps) 
       redTotalOver={redTotalOver}
       redTotalStake={redTotalStake}
       redTypeCount={summaryByType.length}
+      selectedDraw={snapshot.selectedDraw}
       selectedDrawId={snapshot.selectedDraw.id}
       summaryByType={summaryByType}
+      ticketCount={ticketCount}
+      totalActiveStake={totalActiveStake}
       updatedAt={snapshot.updatedAt}
     />
   );
