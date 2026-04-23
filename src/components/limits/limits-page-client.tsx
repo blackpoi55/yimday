@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { Search } from "lucide-react";
 import { addBlockedThreeNumberAction, updateBlockedNumberAction, updateDrawLimitAction } from "@/lib/actions/compat";
 
 type DrawOption = {
@@ -65,6 +65,7 @@ export function LimitsPageClient({
   limits,
   blockedNumbers,
 }: LimitsPageClientProps) {
+  const router = useRouter();
   const twoDigitRows = useMemo(() => buildTwoDigitRows(), []);
   const selectedDraw = draws.find((draw) => draw.id === selectedDrawId) ?? draws[0];
   const activeThreeNumbers = selectedTab === "threeTop" ? blockedNumbers.threeTop : blockedNumbers.threeBottom;
@@ -86,12 +87,13 @@ export function LimitsPageClient({
 
         <div className="panel-body space-y-4">
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <form action="/dashboard/limits" className="flex flex-wrap items-center gap-2">
-              <input name="tab" type="hidden" value={selectedTab} />
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 className="legacy-form-control min-w-[260px]"
-                defaultValue={selectedDraw.id}
-                name="drawId"
+                value={selectedDraw.id}
+                onChange={(event) => {
+                  router.push(buildHref(selectedTab, event.target.value));
+                }}
               >
                 {draws.map((draw) => (
                   <option key={draw.id} value={draw.id}>
@@ -99,11 +101,7 @@ export function LimitsPageClient({
                   </option>
                 ))}
               </select>
-              <button className="legacy-btn-success inline-flex items-center gap-2" type="submit">
-                <Search className="size-4" />
-                ค้นหา
-              </button>
-            </form>
+            </div>
           </div>
 
           <div className="legacy-tab-nav">

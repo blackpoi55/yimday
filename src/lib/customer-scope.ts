@@ -7,8 +7,24 @@ export function buildAgentCustomerWhere(agentId: string): Prisma.UserWhereInput 
     OR: [
       { ownerAgentId: agentId },
       {
+        Ticket_Ticket_customerIdToUser: {
+          some: {
+            agentId,
+          },
+        },
+      },
+      {
         ParentMember: {
           ownerAgentId: agentId,
+        },
+      },
+      {
+        ParentMember: {
+          Ticket_Ticket_customerIdToUser: {
+            some: {
+              agentId,
+            },
+          },
         },
       },
     ],

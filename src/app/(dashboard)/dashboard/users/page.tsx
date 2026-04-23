@@ -67,6 +67,13 @@ function decorateDisplayFields(user: UserRowData) {
   };
 }
 
+function normalizeMemberType<T extends { memberType: MemberType | null }>(user: T) {
+  return {
+    ...user,
+    memberType: user.memberType ?? MemberType.MEMBER,
+  };
+}
+
 function getAgentErrorMessage(error?: string) {
   if (error === "draw-closed") {
     return "ยังไม่อยู่ในช่วงเวลาแทงโพย หรือ งวดถูกปิดรับแล้ว";
@@ -161,7 +168,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const selectedTab = resolvedSearchParams.tab === "staff" ? "staff" : resolvedSearchParams.tab === "client" ? "client" : "member";
 
   if (session.role === Role.AGENT) {
-    const members = await prisma.user.findMany({
+    const members = (await prisma.user.findMany({
       where: buildAgentCustomerWhere(session.userId),
       select: {
         id: true,
@@ -172,7 +179,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       orderBy: {
         createdAt: "asc",
       },
-    });
+    })).map(normalizeMemberType);
 
     const regularMembers = members.filter((member) => member.memberType === MemberType.MEMBER);
     const mainMembers = members.filter((member) => member.memberType === MemberType.MAIN_MEMBER);

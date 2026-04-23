@@ -1,0 +1,181 @@
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { buildTicketDisplayNameMap, getTicketDisplayName } from "@/lib/ticket-display";
+import { toNumber } from "@/lib/utils";
+
+export type MonitorDetailRow = {
+  id: string;
+  betType: string;
+  number: string;
+  amount: number;
+  customerName: string;
+  ticketCode: string;
+  ticketName: string;
+  agentName: string;
+  createdAt: string;
+};
+
+export type MonitorOverLimitItem = {
+  betType: string;
+  number: string;
+  total: number;
+  limit: number;
+  overBy: number;
+};
+
+export type MonitorSnapshot = {
+  draws: Array<{ id: string; name: string }>;
+  selectedDraw: { id: string; name: string };
+  limitByType: Record<string, number | null>;
+  totalsByType: Record<string, Record<string, number>>;
+  threeTodTotals: Record<string, number>;
+  twoTodTotals: Record<string, number>;
+  overLimit: MonitorOverLimitItem[];
+  detailRows: MonitorDetailRow[];
+  updatedAt: string;
+};
+
+function canonicalDigits(value: string) {
+  return value.split("").sort().join("");
+}
+
+export async function getMonitorSnapshot(selectedDrawId?: string): Promise<MonitorSnapshot | null> {
+  const draws = await prisma.draw.findMany({
+    orderBy: {
+      drawDate: "desc",
+    },
+    include: {
+      BetRate: true,
+    },
+  });
+
+  if (draws.length === 0) {
+    return null;
+  }
+
+  const selectedDraw = draws.find((draw) => draw.id === selectedDrawId) ?? draws[0];
+
+  const [betItems, betItemSplits] = await Promise.all([
+    prisma.betItem.findMany({
+      where: {
+        Ticket: {
+          drawId: selectedDraw.id,
+        },
+      },
+      include: {
+        Ticket: {
+          include: {
+            User_Ticket_agentIdToUser: true,
+            User_Ticket_customerIdToUser: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+    prisma.$queryRaw<Array<{ betItemId: string; amount: Prisma.Decimal | number | string }>>`
+      SELECT "betItemId", SUM("amount") AS "amount"
+      FROM "BetItemSplit"
+      WHERE "drawId" = ${selectedDraw.id}
+      GROUP BY "betItemId"
+    `,
+  ]);
+
+  const splitTotalsByBetItemId = betItemSplits.reduce<Record<string, number>>((acc, split) => {
+    acc[split.betItemId] = (acc[split.betItemId] ?? 0) + toNumber(split.amount);
+    return acc;
+  }, {});
+
+  const activeBetItems = betItems
+    .map((item) => {
+      const splitAmount = splitTotalsByBetItemId[item.id] ?? 0;
+      const remainingAmount = Math.max(0, toNumber(item.amount) - splitAmount);
+
+      return {
+        ...item,
+        remainingAmount,
+      };
+    })
+    .filter((item) => item.remainingAmount > 0);
+
+  const totalsByType = activeBetItems.reduce<Record<string, Record<string, number>>>((acc, item) => {
+    acc[item.betType] ??= {};
+    acc[item.betType][item.number] = (acc[item.betType][item.number] ?? 0) + item.remainingAmount;
+    return acc;
+  }, {});
+
+  const threeTodTotals = activeBetItems
+    .filter((item) => item.betType === "THREE_TOD")
+    .reduce<Record<string, number>>((acc, item) => {
+      const key = canonicalDigits(item.number);
+      acc[key] = (acc[key] ?? 0) + item.remainingAmount;
+      return acc;
+    }, {});
+
+  const twoTodTotals = activeBetItems
+    .filter((item) => item.betType === "TWO_TOP" && item.number.length === 2)
+    .reduce<Record<string, number>>((acc, item) => {
+      const key = canonicalDigits(item.number);
+      acc[key] = (acc[key] ?? 0) + item.remainingAmount;
+      return acc;
+    }, {});
+
+  const limitByType = selectedDraw.BetRate.reduce<Record<string, number | null>>((acc, rate) => {
+    acc[rate.betType] = rate.limitPerNumber ? Number(rate.limitPerNumber) : null;
+    return acc;
+  }, {});
+
+  const overLimit = selectedDraw.BetRate.flatMap((rate) => {
+    const limit = rate.limitPerNumber ? Number(rate.limitPerNumber) : null;
+    if (!limit) {
+      return [];
+    }
+
+    return Object.entries(totalsByType[rate.betType] ?? {})
+      .filter(([, total]) => total > limit)
+      .map(([number, total]) => ({
+        betType: rate.betType,
+        number,
+        total,
+        limit,
+        overBy: total - limit,
+      }));
+  }).sort((a, b) => b.overBy - a.overBy);
+
+  const ticketLabelMap = buildTicketDisplayNameMap(
+    activeBetItems.map((item) => ({
+      id: item.Ticket.id,
+      customerId: item.Ticket.customerId,
+      drawId: item.Ticket.drawId,
+      createdAt: item.Ticket.createdAt,
+    })),
+  );
+
+  const detailRows = activeBetItems.map((item) => ({
+    id: item.id,
+    betType: item.betType,
+    number: item.number,
+    amount: item.remainingAmount,
+    customerName: item.Ticket.User_Ticket_customerIdToUser.name,
+    ticketCode: item.Ticket.code,
+    ticketName: getTicketDisplayName(item.Ticket.id, ticketLabelMap, item.Ticket.code),
+    agentName: item.Ticket.User_Ticket_agentIdToUser.name,
+    createdAt: item.createdAt.toISOString(),
+  }));
+
+  return {
+    draws: draws.map((draw) => ({ id: draw.id, name: draw.name })),
+    selectedDraw: {
+      id: selectedDraw.id,
+      name: selectedDraw.name,
+    },
+    limitByType,
+    totalsByType,
+    threeTodTotals,
+    twoTodTotals,
+    overLimit,
+    detailRows,
+    updatedAt: new Date().toISOString(),
+  };
+}

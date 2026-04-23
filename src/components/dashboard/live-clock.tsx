@@ -19,11 +19,11 @@ const THAI_MONTHS = [
 ];
 
 function formatClock(date: Date) {
-  const time = date.toLocaleTimeString("en-US", {
+  const time = date.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: true,
+    hour12: false,
   });
 
   return `${time} วัน${THAI_DAYS[date.getDay()]}ที่ ${date.getDate()} ${THAI_MONTHS[date.getMonth()]} ${date.getFullYear()}`;

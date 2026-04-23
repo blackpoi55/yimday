@@ -18,22 +18,29 @@ type DashboardShellProps = {
 export function DashboardShell({ children, session }: DashboardShellProps) {
   const pathname = usePathname();
   const items = navigationItems.filter((item) => item.roles.includes(session.role as Role));
+  const activeHref =
+    items
+      .filter((item) => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen w-full bg-white">
       <nav className="legacy-navbar">
         <div className="legacy-navbar-inner">
           <div className="legacy-navbar-left">
             <Link className="legacy-navbar-brand" href="/dashboard">
-              <User className="size-14px" strokeWidth={2.5} />
-              <span> : {session.name}</span>
+              <span className="legacy-navbar-brand-icon">
+                <User className="size-14px" strokeWidth={2.5} />
+              </span>
+              <span className="legacy-navbar-brand-text">
+                <span className="legacy-navbar-brand-label">Control</span>
+                <span className="legacy-navbar-brand-name">{session.name}</span>
+              </span>
             </Link>
 
             <div className="legacy-nav">
               {items.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+                const active = item.href === activeHref;
 
                 return (
                   <Link key={item.href} href={item.href} className={cn("legacy-nav-link", active && "active")}>
@@ -49,7 +56,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
               <LiveClock />
             </div>
             <form action={logoutAction}>
-              <button className="legacy-nav-link legacy-logout" type="submit">
+              <button className="legacy-logout" type="submit">
                 <Lock className="size-14px" strokeWidth={2.5} />
                 <span>ออกจากระบบ</span>
               </button>

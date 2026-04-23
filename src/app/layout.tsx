@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="th"
       className={`${notoSansThai.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full w-full flex flex-col">{children}</body>
     </html>
   );
 }
