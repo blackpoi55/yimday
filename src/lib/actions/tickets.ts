@@ -9,6 +9,7 @@ import {
   validateLine,
 } from "@/lib/bet-utils";
 import { requireSession } from "@/lib/auth";
+import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
 import { compatSettingsToCommissionEntries } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
@@ -111,8 +112,7 @@ export async function createTicketAction(
     const customer = await prisma.user.findFirst({
       where: {
         id: customerId,
-        role: Role.CUSTOMER,
-        isActive: true,
+        ...buildAgentCustomerWhere(session.userId),
       },
     });
 

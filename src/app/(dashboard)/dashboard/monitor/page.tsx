@@ -170,7 +170,6 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
     ticketCode: item.Ticket.code,
     agentName: item.Ticket.User_Ticket_agentIdToUser.name,
     createdAt: item.createdAt.toISOString(),
-    note: item.Ticket.note,
     ticketId: item.Ticket.id,
     customerId: item.Ticket.customerId,
     ticketCreatedAt: item.Ticket.createdAt.toISOString(),

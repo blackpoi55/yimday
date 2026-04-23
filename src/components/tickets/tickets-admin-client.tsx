@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Eye } from "lucide-react";
 import { LegacyModal } from "@/components/ui/legacy-modal";
+import { formatLegacyTicketEntry } from "@/lib/legacy-ticket-format";
 import { formatCurrency } from "@/lib/utils";
 
 type TicketItem = {
   id: string;
+  betType: string;
   number: string;
   amount: number;
-  label: string;
 };
 
 type TicketEntry = {
@@ -67,7 +68,11 @@ export function TicketsAdminClient({ draws }: TicketsAdminClientProps) {
     ? chunkItems(
         activeTicket.items.map((item, index) => ({
           order: index + 1,
-          value: `${item.label}:${item.number}=${formatCurrency(item.amount)}`,
+          value: formatLegacyTicketEntry({
+            betType: item.betType,
+            number: item.number,
+            amount: item.amount,
+          }),
         })),
         Math.ceil(activeTicket.items.length / 3) || 1,
       )

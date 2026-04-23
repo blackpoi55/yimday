@@ -51,7 +51,7 @@ const discountGroups = [
   { title: "3บน", payKey: "pay_1", discountKey: "discount_1" },
   { title: "3 โต๊ด", payKey: "pay_2", discountKey: "discount_2" },
   { title: "2 บน", payKey: "pay_3", discountKey: "discount_3" },
-  { title: "2 โต๊ด", payKey: "pay_4", discountKey: "discount_4" },
+  { title: "คู่โต๊ด", payKey: "pay_4", discountKey: "discount_4" },
   { title: "วิ่งบน", payKey: "pay_5", discountKey: "discount_5" },
   { title: "3 ล่าง", payKey: "pay_6", discountKey: "discount_6" },
   { title: "2 ล่าง", payKey: "pay_7", discountKey: "discount_7" },

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSubmit } from "@/components/ui/form-submit";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
+import { Textarea } from "@/components/ui/textarea";
 import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
 import { createDrawAction, saveDrawResultAction, updateDrawAction } from "@/lib/actions/draws";
 
@@ -55,6 +56,9 @@ export function DrawsPageClient({ draws, defaults, hasOpenDraw }: DrawsPageClien
   const [top3, setTop3] = useState("");
   const [bottom3, setBottom3] = useState("");
   const [bottom2, setBottom2] = useState("");
+  const [front3, setFront3] = useState("");
+  const [back3, setBack3] = useState("");
+  const [resultNotes, setResultNotes] = useState("");
 
   const top2 = useMemo(() => {
     if (top3.length === 3) {
@@ -67,6 +71,9 @@ export function DrawsPageClient({ draws, defaults, hasOpenDraw }: DrawsPageClien
     setTop3(draw.result?.top3 ?? "");
     setBottom3(draw.result?.bottom3 ?? "");
     setBottom2(draw.result?.bottom2 ?? "");
+    setFront3(draw.result?.front3 ?? "");
+    setBack3(draw.result?.back3 ?? "");
+    setResultNotes(draw.result?.notes ?? "");
     setModal({ type: "close", draw });
   }
 
@@ -226,9 +233,6 @@ export function DrawsPageClient({ draws, defaults, hasOpenDraw }: DrawsPageClien
           >
             <input name="drawId" type="hidden" value={modal.draw.id} />
             <input name="top2" type="hidden" value={top2} />
-            <input name="front3" type="hidden" value="" />
-            <input name="back3" type="hidden" value="" />
-            <input name="notes" type="hidden" value="" />
 
             <div className="legacy-close-modal-grid">
               <div>
@@ -275,6 +279,45 @@ export function DrawsPageClient({ draws, defaults, hasOpenDraw }: DrawsPageClien
                   onChange={(event) => setBottom2(normalizeDigits(event.target.value, 2))}
                 />
               </div>
+            </div>
+
+            <div className="legacy-modal-grid legacy-modal-grid-2">
+              <div>
+                <label className="legacy-form-label" htmlFor={`front3-${modal.draw.id}`}>
+                  3 ตัวหน้า
+                </label>
+                <Input
+                  id={`front3-${modal.draw.id}`}
+                  maxLength={3}
+                  name="front3"
+                  value={front3}
+                  onChange={(event) => setFront3(normalizeDigits(event.target.value, 3))}
+                />
+              </div>
+              <div>
+                <label className="legacy-form-label" htmlFor={`back3-${modal.draw.id}`}>
+                  3 ตัวท้าย
+                </label>
+                <Input
+                  id={`back3-${modal.draw.id}`}
+                  maxLength={3}
+                  name="back3"
+                  value={back3}
+                  onChange={(event) => setBack3(normalizeDigits(event.target.value, 3))}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="legacy-form-label" htmlFor={`result-notes-${modal.draw.id}`}>
+                หมายเหตุ
+              </label>
+              <Textarea
+                id={`result-notes-${modal.draw.id}`}
+                name="notes"
+                value={resultNotes}
+                onChange={(event) => setResultNotes(event.target.value)}
+              />
             </div>
 
             <div className="legacy-modal-actions">

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Eye, Pencil } from "lucide-react";
 import { UsersPageClient } from "@/components/users/users-page-client";
 import { requireSession } from "@/lib/auth";
+import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
 import { compatSettingsFromPayoutProfiles, defaultUserCompatSettings } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
@@ -160,17 +161,18 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const selectedTab = resolvedSearchParams.tab === "staff" ? "staff" : resolvedSearchParams.tab === "client" ? "client" : "member";
 
   if (session.role === Role.AGENT) {
-    const members = await prisma.$queryRaw<AgentMemberRow[]>`
-      SELECT
-        u.id,
-        u.name,
-        COALESCE(u."memberType", ${MemberType.MEMBER}::"MemberType") AS "memberType",
-        u."parentMemberId"
-      FROM "User" u
-      WHERE u.role = ${Role.CUSTOMER}::"Role"
-        AND u."isActive" = true
-      ORDER BY u."createdAt" ASC
-    `;
+    const members = await prisma.user.findMany({
+      where: buildAgentCustomerWhere(session.userId),
+      select: {
+        id: true,
+        name: true,
+        memberType: true,
+        parentMemberId: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
 
     const regularMembers = members.filter((member) => member.memberType === MemberType.MEMBER);
     const mainMembers = members.filter((member) => member.memberType === MemberType.MAIN_MEMBER);

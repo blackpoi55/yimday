@@ -6,14 +6,14 @@ import { Trash2 } from "lucide-react";
 import { BetType, Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { FormSubmit } from "@/components/ui/form-submit";
-import { Input } from "@/components/ui/input";
+import { LegacyModal } from "@/components/ui/legacy-modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createTicketAction, type TicketActionState } from "@/lib/actions/tickets";
 import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
-import { betTypeDigits, betTypeLabels, betTypeOrder } from "@/lib/constants";
+import { betTypeLabels } from "@/lib/constants";
 import { compatSettingsToCommissionEntries, type UserCompatSettings } from "@/lib/php-compat-shared";
-import { parseQuickEntry, type ParsedQuickLine, type QuickEntryMode } from "@/lib/quick-entry";
+import { parsePhpTicketInput, type LegacyDisplayType, type ParsedPhpTicketLine } from "@/lib/php-ticket-parser";
 import { formatCurrency } from "@/lib/utils";
 
 type DrawOption = {
@@ -51,13 +51,52 @@ type TicketEntryProps = {
   defaultDrawId?: string;
 };
 
-type LocalLine = {
-  betType: BetType;
-  number: string;
-  amount: number;
+type LocalLine = ParsedPhpTicketLine;
+
+type PreviewGroup = {
+  key: LegacyDisplayType;
+  label: string;
+  items: LocalLine[];
 };
 
 const initialState: TicketActionState = {};
+
+const displayTypeLabels: Record<LegacyDisplayType, string> = {
+  TWO_TOP: "2 ตัวบน",
+  TWO_BOTTOM: "2 ตัวล่าง",
+  THREE_STRAIGHT: "3 ตัวบน",
+  THREE_TOD: "3 ตัวโต๊ด",
+  THREE_BOTTOM: "3 ตัวล่าง",
+  FRONT_THREE: "3 ตัวหน้า",
+  BACK_THREE: "3 ตัวท้าย",
+  RUN_TOP: "ลอยบน",
+  RUN_BOTTOM: "ลอยล่าง",
+  TWO_TOD: "คู่โต๊ด",
+};
+
+const previewOrder: LegacyDisplayType[] = [
+  "TWO_TOP",
+  "TWO_BOTTOM",
+  "THREE_STRAIGHT",
+  "THREE_TOD",
+  "THREE_BOTTOM",
+  "TWO_TOD",
+  "RUN_TOP",
+  "RUN_BOTTOM",
+];
+
+function buildPreviewGroups(lines: LocalLine[]) {
+  return previewOrder
+    .map((key) => ({
+      key,
+      label: displayTypeLabels[key],
+      items: lines
+        .filter((line) => line.displayType === key)
+        .slice()
+        .sort((a, b) => a.number.localeCompare(b.number) || b.amount - a.amount),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 export function TicketEntry({
   draws,
@@ -72,13 +111,10 @@ export function TicketEntry({
   const [state, action] = useActionState(createTicketAction, initialState);
   const [selectedDrawId, setSelectedDrawId] = useState(defaultDrawId ?? draws[0]?.id ?? "");
   const [selectedCustomerId, setSelectedCustomerId] = useState(defaultCustomerId ?? customers[0]?.id ?? "");
-  const [betType, setBetType] = useState<BetType>(BetType.TWO_TOP);
-  const [number, setNumber] = useState("");
-  const [amount, setAmount] = useState("");
+  const [rawText, setRawText] = useState("");
+  const [parseError, setParseError] = useState("");
   const [lines, setLines] = useState<LocalLine[]>([]);
-  const [quickMode, setQuickMode] = useState<QuickEntryMode>("TOP");
-  const [quickText, setQuickText] = useState("");
-  const [quickError, setQuickError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const selectedDraw = useMemo(
     () => draws.find((draw) => draw.id === selectedDrawId) ?? draws[0],
@@ -123,6 +159,8 @@ export function TicketEntry({
     };
   }, [commissionMap, lines]);
 
+  const previewGroups = useMemo(() => buildPreviewGroups(lines), [lines]);
+
   useEffect(() => {
     if (state.error) {
       void showErrorAlert(state.error, "บันทึกโพยไม่สำเร็จ");
@@ -141,54 +179,18 @@ export function TicketEntry({
     });
   }, [router, state.message, state.ok, state.redirectTo]);
 
-  function addLine() {
-    const expectedDigits = betTypeDigits[betType];
-    const normalizedNumber = number.replace(/\D/g, "").slice(0, expectedDigits);
-    const parsedAmount = Number(amount);
-
-    if (normalizedNumber.length !== expectedDigits || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      return;
-    }
-
-    setLines((current) => [...current, { betType, number: normalizedNumber, amount: parsedAmount }]);
-    setNumber("");
-    setAmount("");
-  }
-
-  function mergeLines(parsedLines: ParsedQuickLine[]) {
-    setLines((current) => {
-      const merged = new Map<string, LocalLine>();
-
-      for (const item of current) {
-        merged.set(`${item.betType}:${item.number}`, item);
-      }
-
-      for (const item of parsedLines) {
-        const key = `${item.betType}:${item.number}`;
-        const existing = merged.get(key);
-        merged.set(
-          key,
-          existing
-            ? { ...existing, amount: existing.amount + item.amount }
-            : { betType: item.betType, number: item.number, amount: item.amount },
-        );
-      }
-
-      return [...merged.values()];
-    });
-  }
-
-  function addQuickLines() {
-    const parsed = parseQuickEntry(quickMode, quickText);
+  function parseLegacyInput() {
+    const parsed = parsePhpTicketInput(rawText);
 
     if ("error" in parsed) {
-      setQuickError(parsed.error);
+      setParseError(parsed.error);
+      setPreviewOpen(false);
       return;
     }
 
-    setQuickError("");
-    mergeLines(parsed.lines);
-    setQuickText("");
+    setParseError("");
+    setLines(parsed.lines);
+    setPreviewOpen(true);
   }
 
   function removeLine(index: number) {
@@ -199,7 +201,11 @@ export function TicketEntry({
     <div className="legacy-grid-2">
       <div className="space-y-5">
         <form action={action} className="space-y-5">
-          <input name="linesJson" type="hidden" value={JSON.stringify(lines)} />
+          <input
+            name="linesJson"
+            type="hidden"
+            value={JSON.stringify(lines.map(({ betType, number, amount }) => ({ betType, number, amount })))}
+          />
 
           <div className="panel">
             <div className="panel-header">
@@ -246,64 +252,41 @@ export function TicketEntry({
             </div>
           </div>
 
-          <div className="panel panel-info">
-            <div className="panel-header">
-              <h2 className="text-lg font-medium">เพิ่มรายการทีละบรรทัด</h2>
-            </div>
-            <div className="panel-body">
-              <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
-                <Select value={betType} onChange={(event) => setBetType(event.target.value as BetType)}>
-                  {betTypeOrder.map((item) => (
-                    <option key={item} value={item}>
-                      {betTypeLabels[item]}
-                    </option>
-                  ))}
-                </Select>
-                <Input inputMode="numeric" maxLength={betTypeDigits[betType]} placeholder={`เลข ${betTypeDigits[betType]} หลัก`} value={number} onChange={(event) => setNumber(event.target.value)} />
-                <Input inputMode="decimal" min={1} placeholder="จำนวนเงิน" type="number" value={amount} onChange={(event) => setAmount(event.target.value)} />
-                <Button className="w-full md:w-auto" onClick={addLine} type="button">
-                  เพิ่ม
-                </Button>
-              </div>
-            </div>
-          </div>
-
           <div className="panel">
             <div className="panel-header">
               <div>
-                <h2 className="text-lg font-medium">คีย์ลัดแบบข้อความ</h2>
-                <p className="text-xs text-muted-foreground">อิง flow จาก `member_adddata.php`</p>
+                <h2 className="text-lg font-medium">คีย์ตามฟอร์แมต PHP</h2>
+                <p className="text-xs text-muted-foreground">ใช้รูปแบบ `บ:` `ล:` หรือ `บล:` แล้วตรวจสอบก่อนบันทึก</p>
               </div>
             </div>
-            <div className="panel-body space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <button className={quickMode === "TOP" ? "legacy-btn-primary" : "legacy-btn-default"} onClick={() => setQuickMode("TOP")} type="button">บน</button>
-                <button className={quickMode === "BOTTOM" ? "legacy-btn-primary" : "legacy-btn-default"} onClick={() => setQuickMode("BOTTOM")} type="button">ล่าง</button>
-                <button className={quickMode === "MIXED" ? "legacy-btn-primary" : "legacy-btn-default"} onClick={() => setQuickMode("MIXED")} type="button">บน + ล่าง</button>
-              </div>
-
+            <div className="panel-body space-y-4">
               <Textarea
-                placeholder={
-                  quickMode === "TOP"
-                    ? "เช่น\n1=100\n12=100\n123=100\n123*50\n123=100*50\n123*=10\n5=19*10"
-                    : quickMode === "BOTTOM"
-                      ? "เช่น\n4=100\n45=100\n45=100/50\n456=100\n456*=10\n5=19*10"
-                      : "เช่น\n12=100\n12=100/50\n123=100\n123=100/50\n123=100*50/30\n123*=10"
-                }
-                value={quickText}
-                onChange={(event) => setQuickText(event.target.value)}
+                id="legacy-ticket-input"
+                placeholder={"บ:00=200\nล:01=200*200\nบ:001*=150\nบ:103=500*500\nล:080=200\nบ:24=*200\nบ:5=5000\nล:6=500"}
+                rows={12}
+                value={rawText}
+                onChange={(event) => setRawText(event.target.value)}
               />
 
-              <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={addQuickLines} type="button" variant="secondary">
-                  แปลงเป็นรายการ
-                </Button>
-                <span className="text-xs text-muted-foreground">รองรับรูปแบบคีย์ลัดหลักของระบบเดิมในชุดที่ schema ปัจจุบันรองรับ</span>
+              <div className="rounded-sm border border-border bg-muted/40 px-4 py-3 text-xs leading-6 text-muted-foreground">
+                <div>`บ:00=200` = 2 ตัวบน</div>
+                <div>`ล:01=200*200` = 2 ตัวล่าง + กลับเลข</div>
+                <div>`บ:001*=150` = 3 ตัวบนสลับ</div>
+                <div>`บ:103=500*500` = 3 ตัวบน + 3 โต๊ด</div>
+                <div>`บ:24=*200` = คู่โต๊ด</div>
+                <div>`บ:5=5000` = ลอยบน, `ล:6=500` = ลอยล่าง</div>
               </div>
 
-              {quickError ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={parseLegacyInput} type="button" variant="secondary">
+                  ตรวจสอบและแยกรายการ
+                </Button>
+                <span className="text-xs text-muted-foreground">หลังตรวจสอบแล้วระบบจะใช้รายการนี้เป็นชุดสำหรับบันทึกโพย</span>
+              </div>
+
+              {parseError ? (
                 <div className="rounded-sm border border-[#ebccd1] bg-[#f2dede] px-4 py-3 text-sm text-[#a94442]">
-                  {quickError}
+                  {parseError}
                 </div>
               ) : null}
             </div>
@@ -320,21 +303,23 @@ export function TicketEntry({
                     <tr>
                       <th>ประเภท</th>
                       <th>เลข</th>
-                      <th>จำนวนเงิน</th>
+                      <th>ยอดเงิน</th>
+                      <th>ข้อมูลการคีย์</th>
                       <th>จัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lines.length === 0 ? (
                       <tr>
-                        <td colSpan={4}>ยังไม่มีรายการในโพยนี้</td>
+                        <td colSpan={5}>ยังไม่มีรายการในโพยนี้</td>
                       </tr>
                     ) : (
                       lines.map((line, index) => (
-                        <tr key={`${line.betType}-${line.number}-${index}`}>
-                          <td>{betTypeLabels[line.betType]}</td>
+                        <tr key={`${line.displayType}-${line.number}-${index}`}>
+                          <td>{displayTypeLabels[line.displayType] ?? betTypeLabels[line.betType]}</td>
                           <td className="font-mono text-base">{line.number}</td>
                           <td>{formatCurrency(line.amount)}</td>
+                          <td className="font-mono text-xs">{line.source}</td>
                           <td>
                             <button className="legacy-btn-danger px-2 py-1" onClick={() => removeLine(index)} type="button">
                               <Trash2 className="size-4" />
@@ -427,6 +412,46 @@ export function TicketEntry({
           </div>
         </div>
       </div>
+
+      <LegacyModal
+        footer={
+          <div className="legacy-modal-actions">
+            <button className="legacy-btn-default" onClick={() => setPreviewOpen(false)} type="button">
+              ปิด
+            </button>
+          </div>
+        }
+        onClose={() => setPreviewOpen(false)}
+        open={previewOpen}
+        size="lg"
+        title="พรีวิวรายการคีย์ตามฟอร์แมต PHP"
+      >
+        <div className="space-y-5">
+          {previewGroups.map((group: PreviewGroup) => (
+            <div key={group.key}>
+              <h5 className="mb-3 text-base font-medium">{group.label}</h5>
+              <table className="legacy-period-table">
+                <thead>
+                  <tr>
+                    <th>เลข</th>
+                    <th>ยอดเงิน</th>
+                    <th>ข้อมูลการคีย์</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.map((item, index) => (
+                    <tr key={`${group.key}-${item.number}-${index}`}>
+                      <td className="font-mono">{item.number}</td>
+                      <td>{formatCurrency(item.amount)}</td>
+                      <td className="font-mono text-xs">{item.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      </LegacyModal>
     </div>
   );
 }

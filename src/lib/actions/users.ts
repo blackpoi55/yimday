@@ -59,11 +59,13 @@ function parseMemberType(value: string) {
 
 function resolveCustomerShape({
   sessionRole,
+  sessionUserId,
   requestedMemberType,
   rawOwnerAgentId,
   rawParentMemberId,
 }: {
   sessionRole: Role;
+  sessionUserId: string;
   requestedMemberType: string;
   rawOwnerAgentId: string;
   rawParentMemberId: string;
@@ -80,7 +82,7 @@ function resolveCustomerShape({
 
   return {
     memberType: parsedMemberType,
-    ownerAgentId: sessionRole === Role.AGENT ? rawOwnerAgentId || null : rawOwnerAgentId || null,
+    ownerAgentId: sessionRole === Role.AGENT ? sessionUserId : rawOwnerAgentId || null,
     parentMemberId: null,
   };
 }
@@ -115,6 +117,7 @@ export async function createUserAction(
     const { memberType, ownerAgentId, parentMemberId } =
       role === Role.CUSTOMER
         ? resolveCustomerShape({
+            sessionUserId: session.userId,
             rawOwnerAgentId,
             rawParentMemberId,
             requestedMemberType: rawMemberType,
@@ -274,6 +277,7 @@ export async function updateUserProfileAction(
     const { memberType, ownerAgentId, parentMemberId } =
       user.role === Role.CUSTOMER
         ? resolveCustomerShape({
+            sessionUserId: "admin",
             rawOwnerAgentId,
             rawParentMemberId,
             requestedMemberType: rawMemberType || user.memberType || MemberType.MEMBER,

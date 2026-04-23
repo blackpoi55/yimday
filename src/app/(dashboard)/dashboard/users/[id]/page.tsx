@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
+import { betTypeLabels } from "@/lib/constants";
+import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { roleLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { buildTicketDisplayNameMap, getTicketDisplayName, sortByTicketDisplayName } from "@/lib/ticket-display";
@@ -20,15 +22,17 @@ type UserDetailPageProps = {
 type UserWithTickets = NonNullable<Awaited<ReturnType<typeof getUserWithTickets>>>;
 type TicketWithRelations = UserWithTickets["Ticket_Ticket_customerIdToUser"][number];
 
-async function getUserWithTickets(id: string, role: Role) {
+async function getUserWithTickets(id: string, role: Role, sessionUserId?: string) {
   return prisma.user.findFirst({
     where:
       role === Role.ADMIN
         ? { id }
         : {
             id,
-            role: Role.CUSTOMER,
-            isActive: true,
+            ...(sessionUserId ? buildAgentCustomerWhere(sessionUserId) : {
+              role: Role.CUSTOMER,
+              isActive: true,
+            }),
           },
     include: {
       User: true,
@@ -124,7 +128,7 @@ function AgentHistoryPage({
                   <tbody>
                     {selectedTicket.BetItem.map((item) => (
                       <tr key={item.id}>
-                        <td>{item.betType}</td>
+                        <td>{betTypeLabels[item.betType]}</td>
                         <td>{item.number}</td>
                         <td>{formatCurrency(item.amount.toString())}</td>
                         <td>{item.isWinner ? "ถูกรางวัล" : "-"}</td>
@@ -180,7 +184,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
   const { id } = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
 
-  const user = await getUserWithTickets(id, session.role);
+  const user = await getUserWithTickets(id, session.role, session.role === Role.AGENT ? session.userId : undefined);
 
   if (!user) {
     notFound();

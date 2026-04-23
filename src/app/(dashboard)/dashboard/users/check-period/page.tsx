@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
+import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { prisma } from "@/lib/prisma";
 
 type CheckPeriodPageProps = {
@@ -10,7 +11,7 @@ type CheckPeriodPageProps = {
 };
 
 export default async function CheckPeriodPage({ searchParams }: CheckPeriodPageProps) {
-  await requireSession([Role.ADMIN, Role.AGENT]);
+  const session = await requireSession([Role.ADMIN, Role.AGENT]);
   const resolvedSearchParams = (await searchParams) ?? {};
   const customerId = resolvedSearchParams.customerId;
 
@@ -20,11 +21,17 @@ export default async function CheckPeriodPage({ searchParams }: CheckPeriodPageP
 
   const [customer, openDraw] = await Promise.all([
     prisma.user.findFirst({
-      where: {
-        id: customerId,
-        role: Role.CUSTOMER,
-        isActive: true,
-      },
+      where:
+        session.role === Role.ADMIN
+          ? {
+              id: customerId,
+              role: Role.CUSTOMER,
+              isActive: true,
+            }
+          : {
+              id: customerId,
+              ...buildAgentCustomerWhere(session.userId),
+            },
       select: {
         id: true,
       },

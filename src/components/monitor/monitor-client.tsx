@@ -6,6 +6,8 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
+import { showErrorAlert } from "@/lib/client-alerts";
+import { formatLegacyTicketEntry } from "@/lib/legacy-ticket-format";
 import { formatCurrency } from "@/lib/utils";
 
 type GridCell = {
@@ -31,7 +33,6 @@ type DetailRow = {
   ticketName: string;
   agentName: string;
   createdAt: string;
-  note: string | null;
 };
 
 type DrawOption = {
@@ -138,6 +139,42 @@ function canonicalDigits(value: string) {
   return value.split("").sort().join("");
 }
 
+function filterDetailRows(rows: DetailRow[], activeNumber: string, activeType: string) {
+  return rows
+    .filter((row) => {
+      if (activeType === "THREE_TOD") {
+        return row.betType === "THREE_TOD" && canonicalDigits(row.number) === activeNumber;
+      }
+
+      if (activeType === "TWO_TOD") {
+        return row.betType === "TWO_TOP" && canonicalDigits(row.number) === canonicalDigits(activeNumber);
+      }
+
+      return row.number === activeNumber && row.betType === activeType;
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function selectRowsForSplitAmount(rows: DetailRow[], targetAmount: number) {
+  if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+    return rows;
+  }
+
+  const selected: DetailRow[] = [];
+  let runningTotal = 0;
+
+  for (const row of rows) {
+    if (runningTotal >= targetAmount) {
+      break;
+    }
+
+    selected.push(row);
+    runningTotal += row.amount;
+  }
+
+  return selected;
+}
+
 function buildThreeTodRows(bucket: string, totals: Record<string, number>) {
   return Array.from({ length: 10 }, (_, second) =>
     Array.from({ length: 10 }, (_, third) => {
@@ -181,30 +218,28 @@ export function MonitorClient({
 }: MonitorClientProps) {
   const [activeNumber, setActiveNumber] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [splitTarget, setSplitTarget] = useState<OverLimitItem | null>(null);
+  const [splitAmountText, setSplitAmountText] = useState("");
+  const [splitAmount, setSplitAmount] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
   const [searchTrigger, setSearchTrigger] = useState("");
   const isDetailModalOpen = Boolean(activeNumber && activeType);
   const detailModalTitle = activeNumber && activeType ? `${getBetTypeLabel(activeType)} : ${activeNumber}` : "";
+  const splitModalTitle = splitTarget ? `${getBetTypeLabel(splitTarget.betType)} ${splitTarget.number}` : "";
 
   const modalRows = useMemo(() => {
     if (!activeNumber || !activeType) {
       return [];
     }
 
-    return detailRows
-      .filter((row) => {
-        if (activeType === "THREE_TOD") {
-          return row.betType === "THREE_TOD" && canonicalDigits(row.number) === activeNumber;
-        }
+    const matchingRows = filterDetailRows(detailRows, activeNumber, activeType);
+    return splitAmount ? selectRowsForSplitAmount(matchingRows, splitAmount) : matchingRows;
+  }, [activeNumber, activeType, detailRows, splitAmount]);
 
-        if (activeType === "TWO_TOD") {
-          return row.betType === "TWO_TOP" && canonicalDigits(row.number) === canonicalDigits(activeNumber);
-        }
-
-        return row.number === activeNumber && row.betType === activeType;
-      })
-      .sort((a, b) => b.amount - a.amount);
-  }, [activeNumber, activeType, detailRows]);
+  const splitSelectedTotal = useMemo(
+    () => modalRows.reduce((sum, row) => sum + row.amount, 0),
+    [modalRows],
+  );
 
   const searchResults = useMemo(() => {
     const needle = searchTrigger.trim();
@@ -245,6 +280,31 @@ export function MonitorClient({
 
     setActiveNumber(number);
     setActiveType(types[0]);
+    setSplitAmount(null);
+  }
+
+  async function confirmSplitAmount() {
+    if (!splitTarget) {
+      return;
+    }
+
+    const requestedAmount = Number(splitAmountText);
+
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      await showErrorAlert("กรุณาระบุจำนวนเงินที่ต้องการแบ่ง");
+      return;
+    }
+
+    if (requestedAmount > splitTarget.total) {
+      await showErrorAlert("จำนวนเงินที่ต้องการแบ่งต้องไม่มากกว่ายอดรวมของเลขนี้");
+      return;
+    }
+
+    setSplitAmount(requestedAmount);
+    setActiveNumber(splitTarget.number);
+    setActiveType(splitTarget.betType);
+    setSplitTarget(null);
+    setSplitAmountText("");
   }
 
   function renderGridTable(rows: GridCell[][], limit?: number | null, tab?: string) {
@@ -375,8 +435,8 @@ export function MonitorClient({
               <td style={{ padding: "8px 10px", borderTop: "1px solid #eee", textAlign: "right" }}>
                 <button
                   onClick={() => {
-                    setActiveNumber(item.number);
-                    setActiveType(item.betType);
+                    setSplitTarget(item);
+                    setSplitAmountText("");
                   }}
                   style={{
                     background: "#337ab7",
@@ -544,15 +604,64 @@ export function MonitorClient({
       </div>
 
       <LegacyModal
+        open={Boolean(splitTarget)}
+        onClose={() => {
+          setSplitTarget(null);
+          setSplitAmountText("");
+        }}
+        size="sm"
+        title={splitModalTitle}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="legacy-form-label" htmlFor="split-amount">
+              ระบุจำนวนเงินที่ต้องการแบ่ง
+            </label>
+            <Input
+              id="split-amount"
+              inputMode="decimal"
+              type="number"
+              value={splitAmountText}
+              onChange={(event) => setSplitAmountText(event.target.value)}
+            />
+          </div>
+
+          <div className="legacy-modal-actions justify-end">
+            <button
+              className="legacy-btn-default"
+              onClick={() => {
+                setSplitTarget(null);
+                setSplitAmountText("");
+              }}
+              type="button"
+            >
+              ยกเลิก
+            </button>
+            <button className="legacy-btn-info" onClick={() => void confirmSplitAmount()} type="button">
+              ยืนยัน
+            </button>
+          </div>
+        </div>
+      </LegacyModal>
+
+      <LegacyModal
         open={isDetailModalOpen}
         onClose={() => {
           setActiveNumber(null);
           setActiveType(null);
+          setSplitAmount(null);
         }}
         size="lg"
         title={detailModalTitle}
       >
-        <div className="table-shell">
+        <div className="space-y-4">
+          {splitAmount ? (
+            <div className="rounded-sm border border-[#d9edf7] bg-[#f4fbff] px-4 py-3 text-sm text-[#31708f]">
+              แบ่งออก {formatCurrency(splitAmount)} จากยอดที่เลือกได้ {formatCurrency(splitSelectedTotal)}
+            </div>
+          ) : null}
+
+          <div className="table-shell">
           <table>
             <thead>
               <tr>
@@ -577,7 +686,7 @@ export function MonitorClient({
                     <td>{row.customerName}</td>
                     <td>{row.ticketName}</td>
                     <td>{row.agentName}</td>
-                    <td>{row.note || "-"}</td>
+                    <td>{formatLegacyTicketEntry({ betType: row.betType, number: row.number, amount: row.amount, activeType })}</td>
                     <td>{createdAt.toLocaleDateString("sv-SE")}</td>
                     <td>{createdAt.toLocaleTimeString("en-GB")}</td>
                   </tr>
@@ -590,6 +699,7 @@ export function MonitorClient({
               ) : null}
             </tbody>
           </table>
+          </div>
         </div>
       </LegacyModal>
     </>

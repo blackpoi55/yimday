@@ -77,9 +77,9 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
                       note: string | null;
                       items: {
                         id: string;
+                        betType: string;
                         number: string;
                         amount: number;
-                        label: string;
                       }[];
                     }[];
                   }
@@ -110,9 +110,9 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
                   note: ticket.note,
                   items: ticket.BetItem.map((item) => ({
                     id: item.id,
+                    betType: item.betType,
                     number: item.number,
                     amount: Number(item.amount),
-                    label: betTypeLabels[item.betType],
                   })),
                 });
                 acc[ticket.customerId].tickets = sortByTicketDisplayName(acc[ticket.customerId].tickets, ticketDisplayNames);

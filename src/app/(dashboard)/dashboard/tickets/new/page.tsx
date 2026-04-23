@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { TicketEntry } from "@/components/tickets/ticket-entry";
 import { requireSession } from "@/lib/auth";
+import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
 import { getPayoutProfiles } from "@/lib/payouts";
 import { prisma } from "@/lib/prisma";
@@ -42,10 +43,7 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
               isActive: true,
             }
           : session.role === Role.AGENT
-            ? {
-                role: Role.CUSTOMER,
-                isActive: true,
-              }
+            ? buildAgentCustomerWhere(session.userId)
             : {
                 id: session.userId,
               },
