@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { createBetSplitAction } from "@/lib/actions/monitor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
-import { showErrorAlert } from "@/lib/client-alerts";
+import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
 import { formatLegacyTicketEntry } from "@/lib/legacy-ticket-format";
 import { formatCurrency } from "@/lib/utils";
 
@@ -157,22 +159,34 @@ function filterDetailRows(rows: DetailRow[], activeNumber: string, activeType: s
 
 function selectRowsForSplitAmount(rows: DetailRow[], targetAmount: number) {
   if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
-    return rows;
+    return [];
   }
 
-  const selected: DetailRow[] = [];
-  let runningTotal = 0;
+  const selected: Array<DetailRow & { splitAmount: number }> = [];
+  let amountLeft = targetAmount;
 
   for (const row of rows) {
-    if (runningTotal >= targetAmount) {
+    if (amountLeft <= 0) {
       break;
     }
 
-    selected.push(row);
-    runningTotal += row.amount;
+    const splitAmount = Math.min(row.amount, amountLeft);
+    selected.push({
+      ...row,
+      splitAmount,
+    });
+    amountLeft -= splitAmount;
   }
 
   return selected;
+}
+
+function collectSplitTotal(rows: Array<{ splitAmount: number }>) {
+  return rows.reduce((sum, row) => sum + row.splitAmount, 0);
+}
+
+function collectRemainingTotal(rows: DetailRow[]) {
+  return rows.reduce((sum, row) => sum + row.amount, 0);
 }
 
 function buildThreeTodRows(bucket: string, totals: Record<string, number>) {
@@ -216,29 +230,42 @@ export function MonitorClient({
   limitByType,
   detailRows,
 }: MonitorClientProps) {
+  const router = useRouter();
   const [activeNumber, setActiveNumber] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
   const [splitTarget, setSplitTarget] = useState<OverLimitItem | null>(null);
   const [splitAmountText, setSplitAmountText] = useState("");
   const [splitAmount, setSplitAmount] = useState<number | null>(null);
+  const [isSavingSplit, setIsSavingSplit] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searchTrigger, setSearchTrigger] = useState("");
   const isDetailModalOpen = Boolean(activeNumber && activeType);
   const detailModalTitle = activeNumber && activeType ? `${getBetTypeLabel(activeType)} : ${activeNumber}` : "";
   const splitModalTitle = splitTarget ? `${getBetTypeLabel(splitTarget.betType)} ${splitTarget.number}` : "";
 
-  const modalRows = useMemo(() => {
+  const matchingRows = useMemo(() => {
     if (!activeNumber || !activeType) {
       return [];
     }
 
-    const matchingRows = filterDetailRows(detailRows, activeNumber, activeType);
-    return splitAmount ? selectRowsForSplitAmount(matchingRows, splitAmount) : matchingRows;
-  }, [activeNumber, activeType, detailRows, splitAmount]);
+    return filterDetailRows(detailRows, activeNumber, activeType);
+  }, [activeNumber, activeType, detailRows]);
+
+  const splitPlanRows = useMemo(
+    () => (splitAmount ? selectRowsForSplitAmount(matchingRows, splitAmount) : []),
+    [matchingRows, splitAmount],
+  );
+
+  const modalRows = splitAmount ? splitPlanRows : matchingRows;
 
   const splitSelectedTotal = useMemo(
-    () => modalRows.reduce((sum, row) => sum + row.amount, 0),
-    [modalRows],
+    () => collectSplitTotal(splitPlanRows),
+    [splitPlanRows],
+  );
+  const splitRemainingTotal = useMemo(() => collectRemainingTotal(matchingRows), [matchingRows]);
+  const splitPlanById = useMemo(
+    () => new Map(splitPlanRows.map((row) => [row.id, row.splitAmount])),
+    [splitPlanRows],
   );
 
   const searchResults = useMemo(() => {
@@ -305,6 +332,38 @@ export function MonitorClient({
     setActiveType(splitTarget.betType);
     setSplitTarget(null);
     setSplitAmountText("");
+  }
+
+  async function saveSplit() {
+    if (!activeNumber || !activeType || !splitAmount) {
+      return;
+    }
+
+    setIsSavingSplit(true);
+
+    try {
+      const formData = new FormData();
+      formData.set("drawId", selectedDrawId);
+      formData.set("betType", activeType);
+      formData.set("number", activeNumber);
+      formData.set("requestedAmount", String(splitAmount));
+
+      const result = await createBetSplitAction(formData);
+
+      if (!result.ok) {
+        await showErrorAlert(result.error);
+        return;
+      }
+
+      await showSuccessAlert(result.message);
+      setActiveNumber(null);
+      setActiveType(null);
+      setSplitAmount(null);
+      setSplitAmountText("");
+      router.refresh();
+    } finally {
+      setIsSavingSplit(false);
+    }
   }
 
   function renderGridTable(rows: GridCell[][], limit?: number | null, tab?: string) {
@@ -435,6 +494,9 @@ export function MonitorClient({
               <td style={{ padding: "8px 10px", borderTop: "1px solid #eee", textAlign: "right" }}>
                 <button
                   onClick={() => {
+                    setActiveNumber(null);
+                    setActiveType(null);
+                    setSplitAmount(null);
                     setSplitTarget(item);
                     setSplitAmountText("");
                   }}
@@ -577,6 +639,7 @@ export function MonitorClient({
                       onClick={() => {
                         setActiveNumber(searchTrigger);
                         setActiveType(item.type);
+                        setSplitAmount(null);
                       }}
                       style={{
                         width: "280px",
@@ -650,6 +713,7 @@ export function MonitorClient({
           setActiveNumber(null);
           setActiveType(null);
           setSplitAmount(null);
+          setSplitAmountText("");
         }}
         size="lg"
         title={detailModalTitle}
@@ -657,49 +721,69 @@ export function MonitorClient({
         <div className="space-y-4">
           {splitAmount ? (
             <div className="rounded-sm border border-[#d9edf7] bg-[#f4fbff] px-4 py-3 text-sm text-[#31708f]">
-              แบ่งออก {formatCurrency(splitAmount)} จากยอดที่เลือกได้ {formatCurrency(splitSelectedTotal)}
+              ยอดคงเหลือ {formatCurrency(splitRemainingTotal)} | จะแบ่งออก {formatCurrency(splitSelectedTotal)}
             </div>
           ) : null}
 
           <div className="table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>&#3648;&#3621;&#3586;</th>
-                <th>&#3618;&#3629;&#3604;&#3648;&#3591;&#3636;&#3609;</th>
-                <th>&#3650;&#3614;&#3618;&#3586;&#3629;&#3591;</th>
-                <th>&#3594;&#3639;&#3656;&#3629;&#3650;&#3614;&#3618;</th>
-                <th>&#3612;&#3641;&#3657;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
-                <th>&#3586;&#3657;&#3629;&#3617;&#3641;&#3621;&#3585;&#3634;&#3619;&#3588;&#3637;&#3618;&#3660;</th>
-                <th>&#3623;&#3633;&#3609;&#3607;&#3637;&#3656;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
-                <th>&#3648;&#3623;&#3621;&#3634;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modalRows.map((row) => {
-                const createdAt = new Date(row.createdAt);
-
-                return (
-                  <tr key={row.id}>
-                    <td>{row.number}</td>
-                    <td>{formatCurrency(row.amount)}</td>
-                    <td>{row.customerName}</td>
-                    <td>{row.ticketName}</td>
-                    <td>{row.agentName}</td>
-                    <td>{formatLegacyTicketEntry({ betType: row.betType, number: row.number, amount: row.amount, activeType })}</td>
-                    <td>{createdAt.toLocaleDateString("sv-SE")}</td>
-                    <td>{createdAt.toLocaleTimeString("en-GB")}</td>
-                  </tr>
-                );
-              })}
-              {modalRows.length === 0 ? (
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={8}>&#3652;&#3617;&#3656;&#3614;&#3610;&#3619;&#3634;&#3618;&#3621;&#3632;&#3648;&#3629;&#3637;&#3618;&#3604;</td>
+                  <th>&#3648;&#3621;&#3586;</th>
+                  <th>&#3618;&#3629;&#3604;&#3648;&#3591;&#3636;&#3609;</th>
+                  {splitAmount ? <th>ยอดแบ่งออก</th> : null}
+                  <th>&#3650;&#3614;&#3618;&#3586;&#3629;&#3591;</th>
+                  <th>&#3594;&#3639;&#3656;&#3629;&#3650;&#3614;&#3618;</th>
+                  <th>&#3612;&#3641;&#3657;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
+                  <th>&#3586;&#3657;&#3629;&#3617;&#3641;&#3621;&#3585;&#3634;&#3619;&#3588;&#3637;&#3618;&#3660;</th>
+                  <th>&#3623;&#3633;&#3609;&#3607;&#3637;&#3656;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
+                  <th>&#3648;&#3623;&#3621;&#3634;&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {modalRows.map((row) => {
+                  const createdAt = new Date(row.createdAt);
+
+                  return (
+                    <tr key={row.id}>
+                      <td>{row.number}</td>
+                      <td>{formatCurrency(row.amount)}</td>
+                      {splitAmount ? <td>{formatCurrency(splitPlanById.get(row.id) ?? 0)}</td> : null}
+                      <td>{row.customerName}</td>
+                      <td>{row.ticketName}</td>
+                      <td>{row.agentName}</td>
+                      <td>{formatLegacyTicketEntry({ betType: row.betType, number: row.number, amount: row.amount, activeType })}</td>
+                      <td>{createdAt.toLocaleDateString("sv-SE")}</td>
+                      <td>{createdAt.toLocaleTimeString("en-GB")}</td>
+                    </tr>
+                  );
+                })}
+                {modalRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={splitAmount ? 9 : 8}>&#3652;&#3617;&#3656;&#3614;&#3610;&#3619;&#3634;&#3618;&#3621;&#3632;&#3648;&#3629;&#3637;&#3618;&#3604;</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
+
+          {splitAmount ? (
+            <div className="legacy-modal-actions justify-end">
+              <button
+                className="legacy-btn-default"
+                onClick={() => {
+                  setSplitAmount(null);
+                  setSplitAmountText("");
+                }}
+                type="button"
+              >
+                ยกเลิก
+              </button>
+              <button className="legacy-btn-success" disabled={isSavingSplit} onClick={() => void saveSplit()} type="button">
+                {isSavingSplit ? "กำลังบันทึก..." : "บันทึกการแบ่งออก"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </LegacyModal>
     </>

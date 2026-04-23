@@ -18,9 +18,29 @@ model BetItem {
   isWinner   Boolean  @default(false)
   winAmount  Decimal  @default(0) @db.Decimal(12, 2)
   Ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  BetItemSplit BetItemSplit[]
 
   @@index([betType, number])
   @@index([ticketId])
+}
+
+model BetItemSplit {
+  id          String   @id
+  batchId     String
+  betItemId   String
+  drawId      String
+  betType     BetType
+  number      String
+  amount      Decimal  @db.Decimal(12, 2)
+  createdById String
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  BetItem     BetItem  @relation(fields: [betItemId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([betItemId])
+  @@index([drawId, betType, number])
 }
 
 model BetRate {

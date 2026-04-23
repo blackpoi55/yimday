@@ -1,8 +1,9 @@
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { MonitorClient } from "@/components/monitor/monitor-client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildTicketDisplayNameMap, getTicketDisplayName } from "@/lib/ticket-display";
+import { toNumber } from "@/lib/utils";
 
 type MonitorPageProps = {
   searchParams?: Promise<{
@@ -80,18 +81,7 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
 
   const selectedDraw = draws.find((draw) => draw.id === resolvedSearchParams.drawId) ?? draws[0];
 
-  const [grouped, betItems] = await Promise.all([
-    prisma.betItem.groupBy({
-      by: ["betType", "number"],
-      where: {
-        Ticket: {
-          drawId: selectedDraw.id,
-        },
-      },
-      _sum: {
-        amount: true,
-      },
-    }),
+  const [betItems, betItemSplits] = await Promise.all([
     prisma.betItem.findMany({
       where: {
         Ticket: {
@@ -110,24 +100,46 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
         createdAt: "desc",
       },
     }),
+    prisma.$queryRaw<Array<{ betItemId: string; amount: Prisma.Decimal | number | string }>>`
+      SELECT "betItemId", SUM("amount") AS "amount"
+      FROM "BetItemSplit"
+      WHERE "drawId" = ${selectedDraw.id}
+      GROUP BY "betItemId"
+    `,
   ]);
 
-  const totalsByType = grouped.reduce<Record<string, Record<string, number>>>((acc, item) => {
-    const total = Number(item._sum.amount ?? 0);
-    acc[item.betType] ??= {};
-    acc[item.betType][item.number] = total;
+  const splitTotalsByBetItemId = betItemSplits.reduce<Record<string, number>>((acc, split) => {
+    acc[split.betItemId] = (acc[split.betItemId] ?? 0) + toNumber(split.amount);
     return acc;
   }, {});
 
-  const threeTodTotals = betItems
+  const activeBetItems = betItems
+    .map((item) => {
+      const splitAmount = splitTotalsByBetItemId[item.id] ?? 0;
+      const remainingAmount = Math.max(0, toNumber(item.amount) - splitAmount);
+
+      return {
+        ...item,
+        remainingAmount,
+      };
+    })
+    .filter((item) => item.remainingAmount > 0);
+
+  const totalsByType = activeBetItems.reduce<Record<string, Record<string, number>>>((acc, item) => {
+    acc[item.betType] ??= {};
+    acc[item.betType][item.number] = (acc[item.betType][item.number] ?? 0) + item.remainingAmount;
+    return acc;
+  }, {});
+
+  const threeTodTotals = activeBetItems
     .filter((item) => item.betType === "THREE_TOD")
     .reduce<Record<string, number>>((acc, item) => {
       const key = canonicalThreeTod(item.number);
-      acc[key] = (acc[key] ?? 0) + Number(item.amount);
+      acc[key] = (acc[key] ?? 0) + item.remainingAmount;
       return acc;
     }, {});
 
-  const twoTodTotals = betItems
+  const twoTodTotals = activeBetItems
     .filter((item) => item.betType === "TWO_TOP")
     .reduce<Record<string, number>>((acc, item) => {
       if (item.number.length !== 2) {
@@ -135,7 +147,7 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
       }
 
       const key = canonicalTwoTod(item.number);
-      acc[key] = (acc[key] ?? 0) + Number(item.amount);
+      acc[key] = (acc[key] ?? 0) + item.remainingAmount;
       return acc;
     }, {});
 
@@ -161,11 +173,11 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
       }));
   }).sort((a, b) => b.overBy - a.overBy);
 
-  const detailRows = betItems.map((item) => ({
+  const detailRows = activeBetItems.map((item) => ({
     id: item.id,
     betType: item.betType,
     number: item.number,
-    amount: Number(item.amount),
+    amount: item.remainingAmount,
     customerName: item.Ticket.User_Ticket_customerIdToUser.name,
     ticketCode: item.Ticket.code,
     agentName: item.Ticket.User_Ticket_agentIdToUser.name,
@@ -176,7 +188,7 @@ export default async function MonitorPage({ searchParams }: MonitorPageProps) {
   }));
 
   const ticketLabelMap = buildTicketDisplayNameMap(
-    betItems.map((item) => ({
+    activeBetItems.map((item) => ({
       id: item.Ticket.id,
       customerId: item.Ticket.customerId,
       drawId: item.Ticket.drawId,
