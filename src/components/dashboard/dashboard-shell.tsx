@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Lock, User } from "lucide-react";
 import { Role } from "@prisma/client";
 import { logoutAction } from "@/lib/actions/auth";
-import { navigationItems } from "@/lib/constants";
+import { navigationItems, roleLabels, roleNavLabels, roleNavThemes } from "@/lib/constants";
 import type { UserSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { LiveClock } from "@/components/dashboard/live-clock";
@@ -18,6 +18,7 @@ type DashboardShellProps = {
 export function DashboardShell({ children, session }: DashboardShellProps) {
   const pathname = usePathname();
   const items = navigationItems.filter((item) => item.roles.includes(session.role as Role));
+  const navTheme = roleNavThemes[session.role];
   const activeHref =
     items
       .filter((item) => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)))
@@ -25,7 +26,20 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
 
   return (
     <div className="min-h-screen w-full bg-white">
-      <nav className="legacy-navbar">
+      <nav
+        className="legacy-navbar"
+        style={
+          {
+            "--legacy-nav-primary": navTheme.primary,
+            "--legacy-nav-secondary": navTheme.secondary,
+            "--legacy-nav-border": navTheme.border,
+            "--legacy-nav-icon-text": navTheme.iconText,
+            "--legacy-nav-surface": navTheme.navSurface,
+            "--legacy-logout-surface": navTheme.logoutSurface,
+            "--legacy-nav-shadow": navTheme.shadow,
+          } as React.CSSProperties
+        }
+      >
         <div className="legacy-navbar-inner">
           <div className="legacy-navbar-left">
             <Link className="legacy-navbar-brand" href="/dashboard">
@@ -34,7 +48,12 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
               </span>
               <span className="legacy-navbar-brand-text">
                 <span className="legacy-navbar-brand-label">Control</span>
-                <span className="legacy-navbar-brand-name">{session.name}</span>
+                <span className="legacy-navbar-brand-meta">
+                  <span className="legacy-navbar-brand-name">{session.name}</span>
+                  <span className="legacy-role-badge" title={roleLabels[session.role]}>
+                    {roleNavLabels[session.role]}
+                  </span>
+                </span>
               </span>
             </Link>
 

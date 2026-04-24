@@ -8,12 +8,14 @@ import { getUserCompatSettings } from "@/lib/php-compat-store";
 import { compatSettingsFromPayoutProfiles, defaultUserCompatSettings } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
 import { prisma } from "@/lib/prisma";
+import { SELF_ENTRY_NOTE_PREFIX } from "@/lib/ticket-entry-source";
 
 type UsersPageProps = {
   searchParams?: Promise<{
     tab?: string;
     error?: string;
     scope?: string;
+    q?: string;
   }>;
 };
 
@@ -64,6 +66,33 @@ function getAgentMemberScope(value?: string): AgentMemberScope {
   return value === "mine" || value === "tickets" ? value : "all";
 }
 
+function normalizeMemberSearchQuery(value?: string) {
+  return value?.trim().toLocaleLowerCase() ?? "";
+}
+
+function memberMatchesSearch(member: AgentMemberRow, query: string) {
+  if (!query) {
+    return true;
+  }
+
+  return member.name.toLocaleLowerCase().includes(query);
+}
+
+function buildAgentScopeHref(scope: AgentMemberScope, query?: string) {
+  const params = new URLSearchParams();
+
+  if (scope !== "all") {
+    params.set("scope", scope);
+  }
+
+  if (query?.trim()) {
+    params.set("q", query.trim());
+  }
+
+  const queryString = params.toString();
+  return `/dashboard/users${queryString ? `?${queryString}` : ""}`;
+}
+
 function buildAgentMemberWhere(agentId: string, scope: AgentMemberScope, currentDrawId?: string | null): Prisma.UserWhereInput {
   if (scope === "mine") {
     return {
@@ -92,26 +121,22 @@ function buildAgentMemberWhere(agentId: string, scope: AgentMemberScope, current
     return {
       role: Role.CUSTOMER,
       isActive: true,
-      OR: [
-        {
-          Ticket_Ticket_customerIdToUser: {
-            some: {
-              agentId,
-              drawId: currentDrawId,
-            },
-          },
-        },
-        {
-          ParentMember: {
-            Ticket_Ticket_customerIdToUser: {
-              some: {
-                agentId,
-                drawId: currentDrawId,
+      Ticket_Ticket_customerIdToUser: {
+        some: {
+          agentId,
+          drawId: currentDrawId,
+          OR: [
+            { note: null },
+            {
+              note: {
+                not: {
+                  startsWith: SELF_ENTRY_NOTE_PREFIX,
+                },
               },
             },
-          },
+          ],
         },
-      ],
+      },
     };
   }
 
@@ -199,16 +224,18 @@ function AgentMembersPage({
   errorMessage,
   selectedScope,
   currentDrawName,
+  searchQuery,
 }: {
   members: AgentMemberRow[];
   mainMemberGroups: AgentMainMemberGroup[];
   errorMessage: string | null;
   selectedScope: AgentMemberScope;
   currentDrawName?: string | null;
+  searchQuery: string;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="panel max-w-[920px]">
+    <div className="mx-auto w-full max-w-[920px] space-y-4">
+      <div className="panel mx-auto w-full max-w-[920px]">
         <div className="panel-header justify-center">
           <h1 className="text-[22px] font-medium text-[#333]">รายชื่อสมาชิก</h1>
         </div>
@@ -218,14 +245,46 @@ function AgentMembersPage({
           ) : null}
           <div className="legacy-tab-nav">
             {agentMemberScopeLinks.map((item) => (
-              <Link key={item.scope} className={selectedScope === item.scope ? "legacy-tab-link active" : "legacy-tab-link"} href={item.href}>
+              <Link
+                key={item.scope}
+                className={selectedScope === item.scope ? "legacy-tab-link active" : "legacy-tab-link"}
+                href={buildAgentScopeHref(item.scope, searchQuery)}
+              >
                 {item.label}
               </Link>
             ))}
           </div>
+          <form action="/dashboard/users" className="flex flex-col gap-3 rounded-[18px] border border-[#d7e2ee] bg-[#f8fbff] p-4 md:flex-row md:items-center">
+            <input name="scope" type="hidden" value={selectedScope} />
+            <div className="flex-1">
+              <input
+                className="h-11 w-full rounded-xl border border-[#d7e2ee] bg-white px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-[#9bb8ff] focus:ring-2 focus:ring-[#dce8ff]"
+                defaultValue={searchQuery}
+                name="q"
+                placeholder="ค้นหาชื่อสมาชิก"
+                type="search"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-[#cfe0ff] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] px-4 text-sm font-semibold text-[#155eef] shadow-[0_10px_24px_rgba(21,94,239,0.10)] transition-[transform,box-shadow,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[#9dbdff] hover:bg-[#f8fbff] hover:text-[#0f4ed1]"
+                type="submit"
+              >
+                ค้นหา
+              </button>
+              {searchQuery ? (
+                <Link
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-[#d7e2ee] bg-white px-4 text-sm font-medium text-[#475569] transition hover:border-[#bfd0e3] hover:bg-[#f8fafc]"
+                  href={buildAgentScopeHref(selectedScope)}
+                >
+                  ล้าง
+                </Link>
+              ) : null}
+            </div>
+          </form>
           {selectedScope === "tickets" ? (
             <div className="rounded-sm border border-[#bce8f1] bg-[#d9edf7] px-4 py-3 text-sm text-[#31708f]">
-              {currentDrawName ? `แสดงเฉพาะสมาชิกที่มีโพยในงวด: ${currentDrawName}` : "ไม่พบงวดปัจจุบันที่เปิดรับโพย"}
+              {currentDrawName ? `แสดงเฉพาะสมาชิกที่คุณเป็นคนคีย์โพยให้ในงวด: ${currentDrawName}` : "ไม่พบงวดปัจจุบันที่เปิดรับโพย"}
             </div>
           ) : null}
           <AgentMembersTable members={members} />
@@ -233,7 +292,7 @@ function AgentMembersPage({
       </div>
 
       {mainMemberGroups.map((group) => (
-        <details key={group.id} className="panel max-w-[920px]">
+        <details key={group.id} className="panel mx-auto w-full max-w-[920px]">
           <summary className="panel-header cursor-pointer list-none">
             <h2 className="text-lg font-medium">{group.name}</h2>
           </summary>
@@ -253,6 +312,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
   if (session.role === Role.AGENT) {
     const selectedScope = getAgentMemberScope(resolvedSearchParams.scope);
+    const normalizedSearchQuery = normalizeMemberSearchQuery(resolvedSearchParams.q);
     const currentDraw =
       selectedScope === "tickets"
         ? await prisma.draw.findFirst({
@@ -281,13 +341,71 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       },
     })).map(normalizeMemberType);
 
-    const regularMembers = members.filter((member) => member.memberType === MemberType.MEMBER);
-    const mainMembers = members.filter((member) => member.memberType === MemberType.MAIN_MEMBER);
-    const mainMemberGroups = mainMembers.map((mainMember) => ({
+    let regularMembers = members.filter((member) => member.memberType === MemberType.MEMBER);
+    let mainMembers = members.filter((member) => member.memberType === MemberType.MAIN_MEMBER);
+    let mainMemberGroups = mainMembers.map((mainMember) => ({
       id: mainMember.id,
       name: mainMember.name,
       members: members.filter((member) => member.memberType === MemberType.CLIENT_MEMBER && member.parentMemberId === mainMember.id),
     }));
+
+    if (selectedScope === "tickets") {
+      const directClientMembers = members.filter(
+        (member) => member.memberType === MemberType.CLIENT_MEMBER && member.parentMemberId,
+      );
+      const clientParentIds = [
+        ...new Set(
+          directClientMembers
+            .map((member) => member.parentMemberId)
+            .filter((id): id is string => typeof id === "string" && id.length > 0),
+        ),
+      ];
+      const existingMainMemberIds = new Set(mainMembers.map((member) => member.id));
+      const missingParentIds = clientParentIds.filter((id) => !existingMainMemberIds.has(id));
+      const extraMainMembers =
+        missingParentIds.length > 0
+          ? (await prisma.user.findMany({
+              where: {
+                id: {
+                  in: missingParentIds,
+                },
+              },
+              select: {
+                id: true,
+                name: true,
+                memberType: true,
+                parentMemberId: true,
+              },
+              orderBy: {
+                name: "asc",
+              },
+            })).map(normalizeMemberType)
+          : [];
+
+      const groupedMainMembers = [...mainMembers, ...extraMainMembers];
+
+      regularMembers = members.filter(
+        (member) => member.memberType !== MemberType.CLIENT_MEMBER || !member.parentMemberId,
+      );
+      mainMembers = groupedMainMembers;
+      mainMemberGroups = groupedMainMembers
+        .map((mainMember) => ({
+          id: mainMember.id,
+          name: mainMember.name,
+          members: directClientMembers.filter((member) => member.parentMemberId === mainMember.id),
+        }))
+        .filter((group) => group.members.length > 0);
+    }
+
+    if (normalizedSearchQuery) {
+      regularMembers = regularMembers.filter((member) => memberMatchesSearch(member, normalizedSearchQuery));
+      mainMemberGroups = mainMemberGroups
+        .map((group) => ({
+          ...group,
+          members: group.members.filter((member) => memberMatchesSearch(member, normalizedSearchQuery)),
+        }))
+        .filter((group) => memberMatchesSearch({ id: group.id, name: group.name, memberType: MemberType.MAIN_MEMBER, parentMemberId: null }, normalizedSearchQuery) || group.members.length > 0);
+    }
 
     return (
       <AgentMembersPage
@@ -295,6 +413,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         currentDrawName={currentDraw?.name}
         mainMemberGroups={mainMemberGroups}
         members={regularMembers}
+        searchQuery={resolvedSearchParams.q?.trim() ?? ""}
         selectedScope={selectedScope}
       />
     );

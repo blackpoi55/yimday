@@ -8,14 +8,16 @@ import { Button } from "@/components/ui/button";
 import { FormSubmit } from "@/components/ui/form-submit";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
 import { createTicketAction, updateTicketAction, type TicketActionState } from "@/lib/actions/tickets";
 import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
 import { betTypeLabels } from "@/lib/constants";
-import { compatSettingsToCommissionEntries, type UserCompatSettings } from "@/lib/php-compat-shared";
+import type { UserCompatSettings } from "@/lib/php-compat-shared";
 import { parsePhpTicketInput, type LegacyDisplayType, type ParsedPhpTicketLine } from "@/lib/php-ticket-parser";
 import { parseQuickEntry, type QuickEntryMode } from "@/lib/quick-entry";
+import { buildPricingMaps, getLinePricing } from "@/lib/ticket-pricing";
+import { getTicketLineLabel } from "@/lib/ticket-line";
 import { formatCurrency } from "@/lib/utils";
 
 type DrawOption = {
@@ -39,6 +41,7 @@ type CustomerOption = {
 type CommissionProfile = {
   role: Role;
   betType: BetType;
+  payout: number;
   commission: number;
 };
 
@@ -265,10 +268,6 @@ function nineteenTailNumbers(digit: string) {
   return [...values];
 }
 
-function buildNumberEntrySource(label: string, number: string, amount: number) {
-  return `ระบุเลข:${number} ${label}=${amount}`;
-}
-
 function sortDigits(value: string) {
   return value.split("").sort().join("");
 }
@@ -277,7 +276,7 @@ function createNumberEntryLine(
   betType: BetType,
   number: string,
   amount: number,
-  label: string,
+  source: string,
   displayType: LegacyDisplayType = betType,
 ): LocalLine {
   return {
@@ -285,7 +284,7 @@ function createNumberEntryLine(
     displayType,
     number: displayType === "TWO_TOD" ? sortDigits(number) : number,
     amount,
-    source: buildNumberEntrySource(label, number, amount),
+    source,
   };
 }
 
@@ -368,72 +367,76 @@ const numberEntryOptionsByDigits: Record<number, NumberEntryOption[]> = {
     {
       key: "RUN_TOP",
       label: "วิ่งบน",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_TOP, number, amount, "วิ่งบน")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_TOP, number, amount, `บ:${number}=${amount}`)],
     },
     {
       key: "RUN_BOTTOM",
       label: "วิ่งล่าง",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_BOTTOM, number, amount, "วิ่งล่าง")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_BOTTOM, number, amount, `ล:${number}=${amount}`)],
     },
     {
       key: "TAIL19_TOP",
       label: "19 หางบน",
       buildLines: (number, amount) =>
-        nineteenTailNumbers(number).map((item) => createNumberEntryLine(BetType.TWO_TOP, item, amount, "19 หางบน")),
+        nineteenTailNumbers(number).map((item) =>
+          createNumberEntryLine(BetType.TWO_TOP, item, amount, `บ:${number}=19*${amount}`),
+        ),
     },
     {
       key: "TAIL19_BOTTOM",
       label: "19 หางล่าง",
       buildLines: (number, amount) =>
-        nineteenTailNumbers(number).map((item) => createNumberEntryLine(BetType.TWO_BOTTOM, item, amount, "19 หางล่าง")),
+        nineteenTailNumbers(number).map((item) =>
+          createNumberEntryLine(BetType.TWO_BOTTOM, item, amount, `ล:${number}=19*${amount}`),
+        ),
     },
   ],
   2: [
     {
       key: "TWO_TOP",
       label: "2 บน",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 บน")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_TOP, number, amount, `บ:${number}=${amount}`)],
     },
     {
       key: "TWO_BOTTOM",
       label: "2 ล่าง",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, "2 ล่าง")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, `ล:${number}=${amount}`)],
     },
     {
       key: "TWO_MIXED",
       label: "2 บน + 2 ล่าง",
       buildLines: (number, amount) => [
-        createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 บน + 2 ล่าง"),
-        createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, "2 บน + 2 ล่าง"),
+        createNumberEntryLine(BetType.TWO_TOP, number, amount, `บล:${number}=${amount}`),
+        createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, `บล:${number}=${amount}`),
       ],
     },
     {
       key: "TWO_TOP_REVERSED",
       label: "2 บนกลับ",
       buildLines: (number, amount) => [
-        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, "2 บนกลับ"),
+        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, `บ:${reverseDigits(number)}=${amount}`),
       ],
     },
     {
       key: "TWO_BOTTOM_REVERSED",
       label: "2 ล่างกลับ",
       buildLines: (number, amount) => [
-        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, "2 ล่างกลับ"),
+        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, `ล:${reverseDigits(number)}=${amount}`),
       ],
     },
     {
       key: "TWO_REVERSED_MIXED",
       label: "2 กลับ บน + ล่าง",
       buildLines: (number, amount) => [
-        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, "2 กลับ บน + ล่าง"),
-        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, "2 กลับ บน + ล่าง"),
+        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, `บล:${reverseDigits(number)}=${amount}`),
+        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, `บล:${reverseDigits(number)}=${amount}`),
       ],
     },
     {
       key: "TWO_TOD",
       label: "2 โต๊ดบน",
       buildLines: (number, amount) => [
-        createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 โต๊ดบน", "TWO_TOD"),
+        createNumberEntryLine(BetType.TWO_TOP, number, amount, `บ:${number}=*${amount}`, "TWO_TOD"),
       ],
     },
   ],
@@ -441,19 +444,19 @@ const numberEntryOptionsByDigits: Record<number, NumberEntryOption[]> = {
     {
       key: "THREE_TOP",
       label: "3 บน",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_STRAIGHT, number, amount, "3 บน")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_STRAIGHT, number, amount, `บ:${number}=${amount}`)],
     },
     {
       key: "THREE_TOD",
       label: "3 โต๊ดบน",
-      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_TOD, number, amount, "3 โต๊ดบน")],
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_TOD, number, amount, `บ:${number}*${amount}`)],
     },
     {
       key: "THREE_PERMUTATIONS_TOP",
       label: "3,6 กลับบน",
       buildLines: (number, amount) =>
         uniqueThreePermutations(number).map((item) =>
-          createNumberEntryLine(BetType.THREE_STRAIGHT, item, amount, "3,6 กลับบน"),
+          createNumberEntryLine(BetType.THREE_STRAIGHT, item, amount, `บ:${number}*=${amount}`),
         ),
     },
   ],
@@ -507,6 +510,18 @@ function getNumberEntryOptions(number: string) {
   return options;
 }
 
+function sanitizeDecimalInput(value: string) {
+  const cleaned = value.replace(/[^0-9.]/g, "");
+  const [integerPart, ...decimalParts] = cleaned.split(".");
+
+  return decimalParts.length > 0 ? `${integerPart}.${decimalParts.join("")}` : integerPart;
+}
+
+function getPositiveAmount(value?: string) {
+  const amount = Number(value ?? "");
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 export function TicketEntry({
   draws,
   customers,
@@ -520,6 +535,7 @@ export function TicketEntry({
   mode = "create",
   ticketId,
 }: TicketEntryProps) {
+  const isCustomerRole = role === "CUSTOMER";
   const router = useRouter();
   const [state, action] = useActionState(mode === "edit" ? updateTicketAction : createTicketAction, initialState);
   const [selectedDrawId, setSelectedDrawId] = useState(defaultDrawId ?? draws[0]?.id ?? "");
@@ -552,32 +568,42 @@ export function TicketEntry({
   const selectedRates = useMemo(() => selectedDraw?.rates ?? [], [selectedDraw]);
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId) ?? customers[0];
 
-  const commissionMap = useMemo(() => {
-    const map = new Map<BetType, number>();
-
-    for (const rate of selectedRates) {
-      map.set(rate.betType, rate.commission);
-    }
-
-    for (const item of commissionProfiles) {
-      if (item.role === (selectedCustomer?.role ?? Role.CUSTOMER)) {
-        map.set(item.betType, item.commission);
-      }
-    }
-
-    if (selectedCustomer) {
-      for (const item of compatSettingsToCommissionEntries(customerSettings[selectedCustomer.id], selectedCustomer.role)) {
-        map.set(item.betType, item.commission);
-      }
-    }
-
-    return map;
-  }, [commissionProfiles, customerSettings, selectedCustomer, selectedRates]);
+  const selectedRateMap = useMemo(
+    () => new Map(selectedRates.map((rate) => [rate.betType, rate])),
+    [selectedRates],
+  );
+  const drawOptions = useMemo(
+    () =>
+      draws.map((draw) => ({
+        value: draw.id,
+        label: draw.name,
+      })),
+    [draws],
+  );
+  const customerOptions = useMemo(
+    () =>
+      customers.map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+      })),
+    [customers],
+  );
+  const pricingMaps = useMemo(
+    () =>
+      buildPricingMaps(
+        selectedRates,
+        commissionProfiles,
+        selectedCustomer?.role ?? Role.CUSTOMER,
+        selectedCustomer ? customerSettings[selectedCustomer.id] : undefined,
+      ),
+    [commissionProfiles, customerSettings, selectedCustomer, selectedRates],
+  );
 
   const totals = useMemo(() => {
     const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
     const discount = lines.reduce((sum, line) => {
-      const commission = commissionMap.get(line.betType) ?? 0;
+      const rate = selectedRateMap.get(line.betType);
+      const commission = getLinePricing(line, pricingMaps, rate).commission;
       return sum + (line.amount * commission) / 100;
     }, 0);
 
@@ -586,7 +612,55 @@ export function TicketEntry({
       discount,
       total: subtotal - discount,
     };
-  }, [commissionMap, lines]);
+  }, [lines, pricingMaps, selectedRateMap]);
+  const pricingRows = useMemo(() => {
+    const rows: Array<{
+      key: LegacyDisplayType;
+      label: string;
+      payout: number;
+      commission: number;
+      isOpen: boolean;
+    }> = selectedRates.map((rate) => {
+      const pricing = getLinePricing(
+        { betType: rate.betType, displayType: rate.betType },
+        pricingMaps,
+        rate,
+      );
+
+      return {
+        key: rate.betType,
+        label: getTicketLineLabel(rate.betType),
+        payout: pricing.payout,
+        commission: pricing.commission,
+        isOpen: rate.isOpen,
+      };
+    });
+
+    const hasTwoTod = lines.some((line) => line.displayType === "TWO_TOD");
+    const twoTopRate = selectedRateMap.get(BetType.TWO_TOP);
+
+    if (hasTwoTod && twoTopRate) {
+      const pricing = getLinePricing(
+        { betType: BetType.TWO_TOP, displayType: "TWO_TOD" },
+        pricingMaps,
+        twoTopRate,
+      );
+
+      rows.splice(
+        Math.min(3, rows.length),
+        0,
+        {
+          key: "TWO_TOD",
+          label: displayTypeLabels.TWO_TOD,
+          payout: pricing.payout,
+          commission: pricing.commission,
+          isOpen: twoTopRate.isOpen,
+        },
+      );
+    }
+
+    return rows;
+  }, [lines, pricingMaps, selectedRateMap, selectedRates]);
 
   const previewGroups = useMemo(() => buildPreviewGroups(previewLines), [previewLines]);
   const helperConfig = useMemo(
@@ -605,12 +679,22 @@ export function TicketEntry({
     [numberEntryNumber],
   );
   const ticketListSummary = useMemo(() => buildTicketListSummary(lines), [lines]);
+  const availableEntryModeOptions = useMemo(
+    () => (isCustomerRole ? entryModeOptions.filter((option) => option.key === "NUMBER") : entryModeOptions),
+    [isCustomerRole],
+  );
 
   useEffect(() => {
     if (state.error) {
       void showErrorAlert(state.error, "บันทึกโพยไม่สำเร็จ");
     }
   }, [state.error]);
+
+  useEffect(() => {
+    if (isCustomerRole && entryMode !== "NUMBER") {
+      setEntryMode("NUMBER");
+    }
+  }, [entryMode, isCustomerRole]);
 
   useEffect(() => {
     if (!state.ok || !state.message) {
@@ -707,10 +791,47 @@ export function TicketEntry({
       return;
     }
 
-    const generated = options.flatMap((option) => {
-      const amount = Number(numberEntryAmounts[option.key] ?? "");
-      return Number.isFinite(amount) && amount > 0 ? option.buildLines(number, amount) : [];
-    });
+    const consumedKeys = new Set<string>();
+    const generated: LocalLine[] = [];
+
+    if (number.length === 2) {
+      const topAmount = getPositiveAmount(numberEntryAmounts.TWO_TOP);
+      const todAmount = getPositiveAmount(numberEntryAmounts.TWO_TOD);
+
+      if (topAmount && todAmount) {
+        const sharedSource = `บ:${number}=${topAmount}*${todAmount}`;
+        generated.push(createNumberEntryLine(BetType.TWO_TOP, number, topAmount, sharedSource));
+        generated.push(createNumberEntryLine(BetType.TWO_TOP, number, todAmount, sharedSource, "TWO_TOD"));
+        consumedKeys.add("TWO_TOP");
+        consumedKeys.add("TWO_TOD");
+      }
+    }
+
+    if (number.length === 3) {
+      const topAmount = getPositiveAmount(numberEntryAmounts.THREE_TOP);
+      const todAmount = getPositiveAmount(numberEntryAmounts.THREE_TOD);
+
+      if (topAmount && todAmount) {
+        const sharedSource = `บ:${number}=${topAmount}*${todAmount}`;
+        generated.push(createNumberEntryLine(BetType.THREE_STRAIGHT, number, topAmount, sharedSource));
+        generated.push(createNumberEntryLine(BetType.THREE_TOD, number, todAmount, sharedSource));
+        consumedKeys.add("THREE_TOP");
+        consumedKeys.add("THREE_TOD");
+      }
+    }
+
+    for (const option of options) {
+      if (consumedKeys.has(option.key)) {
+        continue;
+      }
+
+      const amount = getPositiveAmount(numberEntryAmounts[option.key]);
+      if (!amount) {
+        continue;
+      }
+
+      generated.push(...option.buildLines(number, amount));
+    }
 
     if (generated.length === 0) {
       setNumberEntryError("กรุณากรอกจำนวนเงินอย่างน้อย 1 รายการ");
@@ -735,10 +856,11 @@ export function TicketEntry({
       <div className="space-y-5">
         <form action={action} className="space-y-5">
           {mode === "edit" ? <input name="ticketId" type="hidden" value={ticketId ?? ""} /> : null}
+          <input name="entryMode" type="hidden" value={entryMode} />
           <input
             name="linesJson"
             type="hidden"
-            value={JSON.stringify(lines.map(({ betType, number, amount }) => ({ betType, number, amount })))}
+            value={JSON.stringify(lines.map(({ betType, displayType, number, amount }) => ({ betType, displayType, number, amount })))}
           />
 
           <div className="panel">
@@ -758,13 +880,15 @@ export function TicketEntry({
                     <label className="legacy-form-label" htmlFor="drawId">
                       งวด
                     </label>
-                    <Select id="drawId" name="drawId" value={selectedDrawId} onChange={(event) => setSelectedDrawId(event.target.value)} required>
-                      {draws.map((draw) => (
-                        <option key={draw.id} value={draw.id}>
-                          {draw.name}
-                        </option>
-                      ))}
-                    </Select>
+                    <SearchableSelect
+                      id="drawId"
+                      name="drawId"
+                      onChange={setSelectedDrawId}
+                      options={drawOptions}
+                      required
+                      searchPlaceholder="ค้นหางวด"
+                      value={selectedDrawId}
+                    />
                   </div>
                 )}
 
@@ -779,19 +903,15 @@ export function TicketEntry({
                     <label className="legacy-form-label" htmlFor="customerId">
                       ลูกค้า
                     </label>
-                    <Select
+                    <SearchableSelect
                       id="customerId"
                       name="customerId"
-                      value={selectedCustomerId}
-                      onChange={(event) => setSelectedCustomerId(event.target.value)}
+                      onChange={setSelectedCustomerId}
+                      options={customerOptions}
                       required
-                    >
-                      {customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </option>
-                      ))}
-                    </Select>
+                      searchPlaceholder="ค้นหาลูกค้า"
+                      value={selectedCustomerId}
+                    />
                   </div>
                 ) : (
                   <input name="customerId" type="hidden" value={defaultCustomerId ?? ""} />
@@ -805,18 +925,18 @@ export function TicketEntry({
             </div>
             <div className="panel-body space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
-                {entryModeOptions.map((mode) => (
+                {availableEntryModeOptions.map((option) => (
                   <button
-                    key={mode.key}
+                    key={option.key}
                     className={`rounded-sm border px-4 py-3 text-left transition ${
-                      entryMode === mode.key
+                      entryMode === option.key
                         ? "border-primary bg-primary/10 text-primary shadow-sm"
                         : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
                     }`}
-                    onClick={() => setEntryMode(mode.key)}
+                    onClick={() => setEntryMode(option.key)}
                     type="button"
                   >
-                    <div className="text-sm font-medium">{mode.label}</div>
+                    <div className="text-sm font-medium">{option.label}</div>
                   </button>
                 ))}
                 <button
@@ -832,6 +952,11 @@ export function TicketEntry({
                   <div className="text-sm font-medium">ระบุตัวเลข</div>
                 </button>
               </div>
+              {isCustomerRole ? (
+                <div className="rounded-sm border border-[#dbe7f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#42526b]">
+                  สมาชิกคีย์โพยได้เฉพาะของตัวเอง และใช้ได้เฉพาะโหมดระบุตัวเลข
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -983,7 +1108,10 @@ export function TicketEntry({
                           placeholder="ระบุจำนวนเงิน"
                           value={numberEntryAmounts[option.key] ?? ""}
                           onChange={(event) => {
-                            setNumberEntryAmounts((current) => ({ ...current, [option.key]: event.target.value }));
+                            setNumberEntryAmounts((current) => ({
+                              ...current,
+                              [option.key]: sanitizeDecimalInput(event.target.value),
+                            }));
                             setNumberEntryError("");
                           }}
                           onKeyDown={(event) => {
@@ -1239,13 +1367,14 @@ export function TicketEntry({
             <h2 className="text-lg font-medium">อัตราจ่ายและส่วนลด</h2>
           </div>
           <div className="panel-body space-y-2">
-            {selectedRates.map((rate) => {
-              const commission = commissionMap.get(rate.betType) ?? rate.commission;
+            {pricingRows.map((row) => {
+              const rate = { payout: row.payout, isOpen: row.isOpen };
+              const commission = row.commission;
 
               return (
-                <div key={rate.betType} className="flex items-center justify-between border-b border-border pb-2 last:border-b-0 last:pb-0">
+                <div key={row.key} className="flex items-center justify-between border-b border-border pb-2 last:border-b-0 last:pb-0">
                   <div>
-                    <div className="font-medium">{betTypeLabels[rate.betType]}</div>
+                    <div className="font-medium">{row.label}</div>
                     <div className="text-xs text-muted-foreground">
                       จ่าย {rate.payout} / ส่วนลด {commission}%
                     </div>

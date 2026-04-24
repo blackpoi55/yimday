@@ -6,8 +6,10 @@ import { TicketEntry } from "@/components/tickets/ticket-entry";
 import { requireSession } from "@/lib/auth";
 import { isDrawAcceptingTickets } from "@/lib/draw-window";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
+import { compatSettingsFromPayoutProfiles } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
 import { prisma } from "@/lib/prisma";
+import { buildAgentRecordedTicketWhere } from "@/lib/ticket-scope";
 import { toNumber } from "@/lib/utils";
 
 type EditTicketPageProps = {
@@ -26,7 +28,7 @@ export default async function EditTicketPage({ params }: EditTicketPageProps) {
         ? { id }
         : {
             id,
-            agentId: session.userId,
+            ...buildAgentRecordedTicketWhere(session.userId),
           },
     include: {
       Draw: {
@@ -73,10 +75,20 @@ export default async function EditTicketPage({ params }: EditTicketPageProps) {
     );
   }
 
-  const [payoutProfiles, customerSettings] = await Promise.all([
+  const [payoutProfiles, rolePayoutProfiles] = await Promise.all([
     getPayoutProfiles(),
-    getUserCompatSettings(ticket.customerId),
+    getPayoutProfiles(ticket.User_Ticket_customerIdToUser.role),
   ]);
+  const customerSettings = await getUserCompatSettings(
+    ticket.customerId,
+    compatSettingsFromPayoutProfiles(
+      rolePayoutProfiles.map((item) => ({
+        betType: item.betType,
+        payout: toNumber(item.payout),
+        commission: toNumber(item.commission),
+      })),
+    ),
+  );
 
   return (
     <div className="space-y-6">
@@ -96,6 +108,7 @@ export default async function EditTicketPage({ params }: EditTicketPageProps) {
         commissionProfiles={payoutProfiles.map((item) => ({
           role: item.role,
           betType: item.betType,
+          payout: toNumber(item.payout),
           commission: toNumber(item.commission),
         }))}
         customerSettings={{
@@ -125,7 +138,7 @@ export default async function EditTicketPage({ params }: EditTicketPageProps) {
         ]}
         initialLines={ticket.BetItem.map((item) => ({
           betType: item.betType,
-          displayType: item.betType,
+          displayType: item.displayType === "TWO_TOD" ? "TWO_TOD" : item.betType,
           number: item.number,
           amount: toNumber(item.amount),
           source: `${item.number}=${toNumber(item.amount)}`,
@@ -138,4 +151,3 @@ export default async function EditTicketPage({ params }: EditTicketPageProps) {
     </div>
   );
 }
-

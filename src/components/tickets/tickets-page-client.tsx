@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Eye, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import { betTypeLabels } from "@/lib/constants";
+import { getTicketLineLabel } from "@/lib/ticket-line";
 import { formatCurrency } from "@/lib/utils";
 
 type TicketItem = {
   id: string;
   betType: keyof typeof betTypeLabels;
+  displayType: string | null;
   number: string;
   amount: number;
   payoutRate: number;
@@ -23,7 +26,7 @@ type TicketEntry = {
   drawName: string;
   displayName: string;
   customerName: string;
-  agentName: string;
+  entryLabel: string;
   subtotal: number;
   discount: number;
   total: number;
@@ -47,7 +50,7 @@ type TicketsPageClientProps = {
 };
 
 type TicketTypeSummary = {
-  betType: TicketItem["betType"];
+  key: string;
   label: string;
   count: number;
   amount: number;
@@ -62,12 +65,13 @@ type TicketGroupSummary = {
 };
 
 function buildTicketTypeSummary(items: TicketItem[]) {
-  const summary = new Map<TicketItem["betType"], TicketTypeSummary>();
+  const summary = new Map<string, TicketTypeSummary>();
 
   for (const item of items) {
-    const current = summary.get(item.betType) ?? {
-      betType: item.betType,
-      label: betTypeLabels[item.betType],
+    const key = item.displayType ?? item.betType;
+    const current = summary.get(key) ?? {
+      key,
+      label: getTicketLineLabel(item.betType, item.displayType),
       count: 0,
       amount: 0,
       winAmount: 0,
@@ -76,7 +80,7 @@ function buildTicketTypeSummary(items: TicketItem[]) {
     current.count += 1;
     current.amount += item.amount;
     current.winAmount += item.winAmount;
-    summary.set(item.betType, current);
+    summary.set(key, current);
   }
 
   return [...summary.values()].sort((a, b) => b.amount - a.amount || a.label.localeCompare(b.label));
@@ -127,7 +131,7 @@ function matchesTicketSearch(ticket: TicketEntry, query: string) {
   const searchText = [
     ticket.displayName,
     ticket.customerName,
-    ticket.agentName,
+    ticket.entryLabel,
     ticket.createdAtLabel,
     ticket.note ?? "",
     ticket.subtotal,
@@ -135,7 +139,7 @@ function matchesTicketSearch(ticket: TicketEntry, query: string) {
     ticket.total,
     ticket.winAmount,
     ...ticket.items.flatMap((item) => [
-      betTypeLabels[item.betType],
+      getTicketLineLabel(item.betType, item.displayType),
       item.number,
       item.amount,
       item.winAmount,
@@ -251,7 +255,7 @@ export function TicketsPageClient({
                                   </div>
                                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                     <span>{ticket.items.length} รายการ</span>
-                                    <span>พนักงาน {ticket.agentName}</span>
+                                    <span>ผู้บันทึก {ticket.entryLabel}</span>
                                     <span>บันทึกเมื่อ {ticket.createdAtLabel}</span>
                                   </div>
                                 </div>
@@ -277,14 +281,14 @@ export function TicketsPageClient({
                             </summary>
 
                             <div className="space-y-4 px-4 py-4">
-                              <div className="grid gap-3 md:grid-cols-6">
+                              <div className="grid gap-3 md:grid-cols-5">
                                 <div className="rounded-xl border border-[#e5edf5] bg-[#fbfdff] px-4 py-3">
                                   <div className="text-xs text-muted-foreground">ลูกค้า</div>
                                   <div className="mt-1 font-medium">{ticket.customerName}</div>
                                 </div>
                                 <div className="rounded-xl border border-[#e5edf5] bg-[#fbfdff] px-4 py-3">
-                                  <div className="text-xs text-muted-foreground">พนักงาน</div>
-                                  <div className="mt-1 font-medium">{ticket.agentName}</div>
+                                  <div className="text-xs text-muted-foreground">ผู้บันทึก</div>
+                                  <div className="mt-1 font-medium">{ticket.entryLabel}</div>
                                 </div>
                                 <div className="rounded-xl border border-[#e5edf5] bg-[#fbfdff] px-4 py-3">
                                   <div className="text-xs text-muted-foreground">ยอดแทง</div>
@@ -298,16 +302,26 @@ export function TicketsPageClient({
                                   <div className="text-xs text-muted-foreground">ยอดสุทธิ</div>
                                   <div className="mt-1 font-semibold text-[#155eef]">{formatCurrency(ticket.total)}</div>
                                 </div>
-                                <div className="flex items-center justify-end">
-                                  <div className="flex flex-wrap justify-end gap-2">
-                                    <Link href={reportHref} rel="noreferrer" target="_blank">
-                                      <Button variant="outline">PDF</Button>
-                                    </Link>
-                                    <button className="legacy-btn-default" onClick={() => setActiveTicketId(ticket.id)} type="button">
-                                      รายละเอียด
-                                    </button>
-                                  </div>
-                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#e6edf6] pt-1">
+                                <Link
+                                  className="inline-flex min-h-[46px] min-w-[122px] items-center justify-center gap-2 rounded-[14px] border border-[#cfe0ff] bg-white px-4 py-3 text-sm font-semibold text-[#155eef] shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-[transform,box-shadow,background-color,border-color] duration-200 hover:-translate-y-px hover:border-[#9dbdff] hover:bg-[#f8fbff]"
+                                  href={reportHref}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  <FileText className="size-4" />
+                                  PDF
+                                </Link>
+                                <button
+                                  className="inline-flex min-h-[46px] min-w-[172px] items-center justify-center gap-2 rounded-[14px] border border-[#155eef] bg-[linear-gradient(135deg,#2f6dff_0%,#155eef_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(21,94,239,0.22)] transition-[transform,box-shadow,filter] duration-200 hover:-translate-y-px hover:brightness-[1.03]"
+                                  onClick={() => setActiveTicketId(ticket.id)}
+                                  type="button"
+                                >
+                                  <Eye className="size-4" />
+                                  รายละเอียด
+                                </button>
                               </div>
 
                               {typeSummary.length > 0 ? (
@@ -318,7 +332,7 @@ export function TicketsPageClient({
                                   </div>
                                   <div className="flex flex-wrap gap-2">
                                     {typeSummary.map((item) => (
-                                      <div key={item.betType} className="min-w-[160px] rounded-xl border border-[#dfe8f2] bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+                                      <div key={item.key} className="min-w-[160px] rounded-xl border border-[#dfe8f2] bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
                                         <div className="text-sm font-medium">{item.label}</div>
                                         <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                                           <span>{item.count} รายการ</span>
@@ -354,7 +368,7 @@ export function TicketsPageClient({
                                   <tbody>
                                     {ticket.items.map((item) => (
                                       <tr key={item.id} className={item.winAmount > 0 ? "bg-[#f6fff8]" : undefined}>
-                                        <td>{betTypeLabels[item.betType]}</td>
+                                        <td>{getTicketLineLabel(item.betType, item.displayType)}</td>
                                         <td className="font-mono text-base">{item.number}</td>
                                         <td>{formatCurrency(item.amount)}</td>
                                         <td className={item.winAmount > 0 ? "font-semibold text-[#1f6f43]" : undefined}>
@@ -474,8 +488,8 @@ export function TicketsPageClient({
                       <td>{activeTicket.customerName}</td>
                     </tr>
                     <tr>
-                      <th>พนักงาน</th>
-                      <td>{activeTicket.agentName}</td>
+                      <th>ผู้บันทึก</th>
+                      <td>{activeTicket.entryLabel}</td>
                     </tr>
                     <tr>
                       <th>วันที่บันทึก</th>
@@ -506,8 +520,14 @@ export function TicketsPageClient({
                   <div>
                     <h2 className="text-lg font-medium">หมายเหตุ</h2>
                   </div>
-                  <Link href={`/reports/tickets/${activeTicket.id}?print=1`} rel="noreferrer" target="_blank">
-                    <Button variant="outline">PDF</Button>
+                  <Link
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-[#cfe0ff] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] px-4 py-2 text-sm font-semibold text-[#155eef] shadow-[0_10px_24px_rgba(21,94,239,0.10)] transition-[transform,box-shadow,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[#9dbdff] hover:bg-[#f8fbff] hover:text-[#0f4ed1]"
+                    href={`/reports/tickets/${activeTicket.id}?print=1`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <FileText className="size-4" />
+                    เปิด PDF
                   </Link>
                 </div>
                 <div className="panel-body text-sm text-muted-foreground">{activeTicket.note || "-"}</div>
@@ -529,7 +549,7 @@ export function TicketsPageClient({
                 <tbody>
                   {activeTicket.items.map((item) => (
                     <tr key={item.id}>
-                      <td>{betTypeLabels[item.betType]}</td>
+                      <td>{getTicketLineLabel(item.betType, item.displayType)}</td>
                       <td className="font-mono text-base">{item.number}</td>
                       <td>{formatCurrency(item.amount)}</td>
                       <td>{formatCurrency(item.payoutRate)}</td>

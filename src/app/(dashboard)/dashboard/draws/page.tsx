@@ -1,4 +1,4 @@
-import { DrawStatus, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { DrawsPageClient } from "@/components/draws/draws-page-client";
 import { requireSession } from "@/lib/auth";
 import { toDateInputValue, toTimeInputValue } from "@/lib/dates";
@@ -25,7 +25,6 @@ export default async function DrawsPage() {
     },
   });
 
-  const openDraw = draws.find((draw) => draw.status === DrawStatus.OPEN) ?? null;
   const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -52,17 +51,24 @@ export default async function DrawsPage() {
         notes: draw.notes,
         result: draw.DrawResult
           ? {
+              firstPrize: draw.DrawResult.firstPrize,
+              firstPrizeAdjacent: draw.DrawResult.firstPrizeAdjacent,
+              secondPrize: draw.DrawResult.secondPrize,
+              thirdPrize: draw.DrawResult.thirdPrize,
+              fourthPrize: draw.DrawResult.fourthPrize,
+              fifthPrize: draw.DrawResult.fifthPrize,
               top3: draw.DrawResult.top3,
               top2: draw.DrawResult.top2,
               bottom3: draw.DrawResult.bottom3,
               bottom2: draw.DrawResult.bottom2,
               front3: draw.DrawResult.front3,
+              front3Second: draw.DrawResult.front3Second,
               back3: draw.DrawResult.back3,
+              back3Second: draw.DrawResult.back3Second,
               notes: draw.DrawResult.notes,
             }
           : null,
       }))}
-      hasOpenDraw={Boolean(openDraw)}
     />
   );
 }

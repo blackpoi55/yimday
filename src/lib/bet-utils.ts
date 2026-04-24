@@ -1,10 +1,14 @@
 import { BetItem, BetRate, BetType, type PayoutProfile, Role } from "@prisma/client";
 import { betTypeDigits, betTypeLabels } from "@/lib/constants";
-import { buildCommissionMap } from "@/lib/payouts";
+import { buildPricingMaps, getLinePricing } from "@/lib/ticket-pricing";
+import { normalizeTicketDisplayType } from "@/lib/ticket-line";
 import { toNumber } from "@/lib/utils";
+import type { LegacyDisplayType } from "@/lib/php-ticket-parser";
+import type { UserCompatSettings } from "@/lib/php-compat-shared";
 
 export type TicketLineInput = {
   betType: BetType;
+  displayType?: LegacyDisplayType;
   number: string;
   amount: number;
 };
@@ -64,9 +68,10 @@ export function calculateTicketTotals(
   rates: RateLike[],
   payoutProfiles: PayoutLike[] = [],
   role: Role = Role.CUSTOMER,
+  userSettings?: Partial<UserCompatSettings>,
 ) {
   const rateMap = buildRateMap(rates);
-  const commissionMap = buildCommissionMap(payoutProfiles, rates, role);
+  const pricingMaps = buildPricingMaps(rates, payoutProfiles, role, userSettings);
 
   let subtotal = 0;
   let discount = 0;
@@ -78,7 +83,7 @@ export function calculateTicketTotals(
       throw new Error(`ไม่พบอัตราจ่ายของ ${betTypeLabels[line.betType]}`);
     }
 
-    const commission = commissionMap.get(line.betType) ?? rate.commission;
+    const { commission } = getLinePricing(line, pricingMaps, rate);
     subtotal += line.amount;
     discount += (line.amount * commission) / 100;
   }
@@ -100,22 +105,30 @@ type DrawResultLike = {
   bottom2: string;
   bottom3?: string | null;
   front3?: string | null;
+  front3Second?: string | null;
   back3?: string | null;
+  back3Second?: string | null;
 };
 
 export function evaluateBet(
-  item: Pick<BetItem, "betType" | "number"> | TicketLineInput,
+  item: Pick<BetItem, "betType" | "displayType" | "number"> | TicketLineInput,
   result: DrawResultLike,
 ) {
   const top2 = result.top2 || result.top3.slice(-2);
   const bottom3 = result.bottom3 || result.bottom2;
+  const displayType = normalizeTicketDisplayType(item.betType, item.displayType);
   let isWinner = false;
   let hitLabel: string | null = null;
 
   switch (item.betType) {
     case BetType.TWO_TOP:
-      isWinner = item.number === top2;
-      hitLabel = isWinner ? `2 บน ${top2}` : null;
+      if (displayType === "TWO_TOD") {
+        isWinner = sortDigits(item.number) === sortDigits(top2);
+        hitLabel = isWinner ? `2 โต๊ด ${top2}` : null;
+      } else {
+        isWinner = item.number === top2;
+        hitLabel = isWinner ? `2 บน ${top2}` : null;
+      }
       break;
     case BetType.TWO_BOTTOM:
       isWinner = item.number === result.bottom2;
@@ -134,12 +147,12 @@ export function evaluateBet(
       hitLabel = isWinner ? `3 ล่าง ${result.bottom3}` : null;
       break;
     case BetType.FRONT_THREE:
-      isWinner = !!result.front3 && item.number === result.front3;
-      hitLabel = isWinner ? `3 หน้า ${result.front3}` : null;
+      isWinner = [result.front3, result.front3Second].filter(Boolean).includes(item.number);
+      hitLabel = isWinner ? `3 หน้า ${item.number}` : null;
       break;
     case BetType.BACK_THREE:
-      isWinner = !!result.back3 && item.number === result.back3;
-      hitLabel = isWinner ? `3 ท้าย ${result.back3}` : null;
+      isWinner = [result.back3, result.back3Second].filter(Boolean).includes(item.number);
+      hitLabel = isWinner ? `3 ท้าย ${item.number}` : null;
       break;
     case BetType.RUN_TOP:
       isWinner = result.top3.includes(item.number);

@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import { Role } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
-import { betTypeLabels } from "@/lib/constants";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { isDrawAcceptingTickets } from "@/lib/draw-window";
 import { roleLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { getTicketRecorderLabel, parseTicketEntryNote } from "@/lib/ticket-entry-source";
+import { getTicketLineLabel } from "@/lib/ticket-line";
 import { buildTicketDisplayNameMap, getTicketDisplayName, sortByTicketDisplayName } from "@/lib/ticket-display";
+import { buildAgentRecordedTicketWhere } from "@/lib/ticket-scope";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 type UserDetailPageProps = {
@@ -22,6 +25,9 @@ type UserDetailPageProps = {
 
 type UserWithTickets = NonNullable<Awaited<ReturnType<typeof getUserWithTickets>>>;
 type TicketWithRelations = UserWithTickets["Ticket_Ticket_customerIdToUser"][number];
+type AgentHistoryTicket = TicketWithRelations & {
+  entryLabel: string;
+};
 
 async function getUserWithTickets(id: string, role: Role, sessionUserId?: string) {
   return prisma.user.findFirst({
@@ -38,9 +44,11 @@ async function getUserWithTickets(id: string, role: Role, sessionUserId?: string
     include: {
       User: true,
       Ticket_Ticket_customerIdToUser: {
+        where: role === Role.AGENT && sessionUserId ? buildAgentRecordedTicketWhere(sessionUserId) : undefined,
         include: {
           Draw: true,
           BetItem: true,
+          User_Ticket_agentIdToUser: true,
         },
         orderBy: {
           createdAt: "desc",
@@ -65,7 +73,16 @@ function AgentHistoryPage({
       createdAt: ticket.createdAt,
     })),
   );
-  const orderedTickets = sortByTicketDisplayName(user.Ticket_Ticket_customerIdToUser, ticketDisplayNames);
+  const orderedTickets = user.Ticket_Ticket_customerIdToUser
+    .map((ticket) => {
+      const parsedEntryNote = parseTicketEntryNote(ticket.note);
+
+      return {
+        ...ticket,
+        entryLabel: getTicketRecorderLabel(ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry),
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const selectedTicket =
     (selectedTicketId
       ? orderedTickets.find((ticket) => ticket.id === selectedTicketId)
@@ -76,7 +93,7 @@ function AgentHistoryPage({
     Array<{
       drawId: string;
       drawName: string;
-      tickets: TicketWithRelations[];
+      tickets: AgentHistoryTicket[];
     }>
   >((groups, ticket) => {
     const existing = groups.find((group) => group.drawId === ticket.drawId);
@@ -107,17 +124,29 @@ function AgentHistoryPage({
               <div className="rounded-sm border border-border px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-base font-medium">{getTicketDisplayName(selectedTicket.id, ticketDisplayNames, selectedTicket.code)}</div>
-                  {selectedTicketCanEdit ? (
-                    <Link href={`/dashboard/tickets/${selectedTicket.id}/edit`}>
-                      <Button size="sm">แก้ไขโพย</Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      className="inline-flex min-h-[30px] items-center justify-center gap-2 rounded-[12px] border border-[#cfe0ff] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] px-3 py-1.5 text-sm font-semibold text-[#155eef] shadow-[0_10px_24px_rgba(21,94,239,0.10)] transition-[transform,box-shadow,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[#9dbdff] hover:bg-[#f8fbff] hover:text-[#0f4ed1]"
+                      href={`/reports/tickets/${selectedTicket.id}?print=1`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <FileText className="size-4" />
+                      PDF
                     </Link>
-                  ) : (
-                    <span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">ปิดแก้ไขแล้ว</span>
-                  )}
+                    {selectedTicketCanEdit ? (
+                      <Link href={`/dashboard/tickets/${selectedTicket.id}/edit`}>
+                        <Button size="sm">แก้ไขโพย</Button>
+                      </Link>
+                    ) : (
+                      <span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">ปิดแก้ไขแล้ว</span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {selectedTicket.Draw.name} | {formatDateTime(selectedTicket.createdAt)}
                 </div>
+                <div className="mt-1 text-sm text-muted-foreground">ผู้บันทึก {selectedTicket.entryLabel}</div>
                 <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                   <div>ยอดแทงรวม {formatCurrency(selectedTicket.subtotal.toString())}</div>
                   <div>ส่วนลด {formatCurrency(selectedTicket.discount.toString())}</div>
@@ -139,7 +168,7 @@ function AgentHistoryPage({
                   <tbody>
                     {selectedTicket.BetItem.map((item) => (
                       <tr key={item.id}>
-                        <td>{betTypeLabels[item.betType]}</td>
+                        <td>{getTicketLineLabel(item.betType, item.displayType)}</td>
                         <td>{item.number}</td>
                         <td>{formatCurrency(item.amount.toString())}</td>
                         <td>{item.isWinner ? "ถูกรางวัล" : "-"}</td>
@@ -172,13 +201,25 @@ function AgentHistoryPage({
               <div className="panel-body space-y-2">
                 {draw.tickets.map((ticket) => (
                   <div key={ticket.id} className="text-sm">
-                    <Link
-                      className={selectedTicket?.id === ticket.id ? "font-medium text-primary underline" : "text-primary underline"}
-                      href={`/dashboard/users/${user.id}?ticketId=${ticket.id}`}
-                    >
-                      {getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code)}
-                    </Link>
-                    <span className="text-muted-foreground"> | {formatDateTime(ticket.createdAt)}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Link
+                        className={selectedTicket?.id === ticket.id ? "font-medium text-primary underline" : "text-primary underline"}
+                        href={`/dashboard/users/${user.id}?ticketId=${ticket.id}`}
+                      >
+                        {getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code)}
+                      </Link>
+                      <span className="text-muted-foreground">| {formatDateTime(ticket.createdAt)}</span>
+                      <Link
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[#155eef] underline-offset-2 hover:underline"
+                        href={`/reports/tickets/${ticket.id}?print=1`}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <FileText className="size-3.5" />
+                        PDF
+                      </Link>
+                    </div>
+                    <div className="text-xs text-muted-foreground">ผู้บันทึก {ticket.entryLabel}</div>
                   </div>
                 ))}
               </div>

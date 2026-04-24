@@ -2,8 +2,10 @@ import Link from "next/link";
 import { Role } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { betTypeLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { getTicketRecorderLabel, parseTicketEntryNote } from "@/lib/ticket-entry-source";
+import { getTicketLineLabel } from "@/lib/ticket-line";
+import { buildAgentRecordedTicketWhere } from "@/lib/ticket-scope";
 import { buildTicketDisplayNameMap, getTicketDisplayName } from "@/lib/ticket-display";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
@@ -22,7 +24,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
       session.role === Role.ADMIN
         ? { id }
         : session.role === Role.AGENT
-          ? { id, agentId: session.userId }
+          ? { id, ...buildAgentRecordedTicketWhere(session.userId) }
           : { id, customerId: session.userId },
     include: {
       Draw: true,
@@ -37,10 +39,17 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   }
 
   const siblingTickets = await prisma.ticket.findMany({
-    where: {
-      customerId: ticket.customerId,
-      drawId: ticket.drawId,
-    },
+    where:
+      session.role === Role.AGENT
+        ? {
+            customerId: ticket.customerId,
+            drawId: ticket.drawId,
+            ...buildAgentRecordedTicketWhere(session.userId),
+          }
+        : {
+            customerId: ticket.customerId,
+            drawId: ticket.drawId,
+          },
     select: {
       id: true,
       customerId: true,
@@ -51,6 +60,8 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 
   const ticketDisplayNames = buildTicketDisplayNameMap(siblingTickets);
   const displayName = getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code);
+  const parsedEntryNote = parseTicketEntryNote(ticket.note);
+  const recorderLabel = getTicketRecorderLabel(ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry);
 
   return (
     <div className="space-y-6">
@@ -59,7 +70,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
           <div>
             <h1 className="legacy-title">{displayName}</h1>
             <p className="legacy-subtitle">
-              {ticket.Draw.name} | ลูกค้า {ticket.User_Ticket_customerIdToUser.name} | พนักงาน {ticket.User_Ticket_agentIdToUser.name}
+              {ticket.Draw.name} | ลูกค้า {ticket.User_Ticket_customerIdToUser.name} | ผู้บันทึก {recorderLabel}
             </p>
           </div>
           <Link className="legacy-btn-default" href={`/reports/tickets/${ticket.id}?print=1`} rel="noreferrer" target="_blank">
@@ -99,7 +110,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               <div className="panel-header">
                 <h2 className="text-lg font-medium">หมายเหตุ</h2>
               </div>
-              <div className="panel-body text-sm text-muted-foreground">{ticket.note || "-"}</div>
+              <div className="panel-body text-sm text-muted-foreground">{parsedEntryNote.displayNote || "-"}</div>
             </div>
           </div>
         </div>
@@ -125,7 +136,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               <tbody>
                 {ticket.BetItem.map((item) => (
                   <tr key={item.id}>
-                    <td>{betTypeLabels[item.betType]}</td>
+                    <td>{getTicketLineLabel(item.betType, item.displayType)}</td>
                     <td className="font-mono text-base">{item.number}</td>
                     <td>{formatCurrency(item.amount.toString())}</td>
                     <td>{formatCurrency(item.payoutRate?.toString() ?? "0")}</td>

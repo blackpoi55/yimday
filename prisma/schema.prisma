@@ -10,6 +10,7 @@ model BetItem {
   id         String   @id
   ticketId   String
   betType    BetType
+  displayType String?
   number     String
   amount     Decimal  @db.Decimal(12, 2)
   payoutRate Decimal? @db.Decimal(10, 2)
@@ -81,12 +82,20 @@ model Draw {
 model DrawResult {
   id        String   @id
   drawId    String   @unique
+  firstPrize String?
+  firstPrizeAdjacent String?
+  secondPrize String?
+  thirdPrize String?
+  fourthPrize String?
+  fifthPrize String?
   top3      String
   top2      String?
   bottom2   String
   bottom3   String?
   front3    String?
+  front3Second String?
   back3     String?
+  back3Second String?
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime

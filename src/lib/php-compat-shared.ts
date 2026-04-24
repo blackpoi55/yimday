@@ -1,4 +1,5 @@
 import { BetType, Role } from "@prisma/client";
+import type { TicketPricingKey } from "@/lib/ticket-pricing";
 
 export type UserCompatSettings = {
   pay_1: number;
@@ -73,6 +74,19 @@ export function compatSettingsToCommissionEntries(settings: UserCompatSettings, 
     { role, betType: BetType.TWO_BOTTOM, commission: settings.discount_7 },
     { role, betType: BetType.RUN_BOTTOM, commission: settings.discount_8 },
   ];
+}
+
+export function compatSettingsToPricingMap(settings: UserCompatSettings) {
+  return new Map<TicketPricingKey, { payout: number; commission: number }>([
+    [BetType.THREE_STRAIGHT, { payout: settings.pay_1, commission: settings.discount_1 }],
+    [BetType.THREE_TOD, { payout: settings.pay_2, commission: settings.discount_2 }],
+    [BetType.TWO_TOP, { payout: settings.pay_3, commission: settings.discount_3 }],
+    ["TWO_TOD", { payout: settings.pay_4, commission: settings.discount_4 }],
+    [BetType.RUN_TOP, { payout: settings.pay_5, commission: settings.discount_5 }],
+    [BetType.THREE_BOTTOM, { payout: settings.pay_6, commission: settings.discount_6 }],
+    [BetType.TWO_BOTTOM, { payout: settings.pay_7, commission: settings.discount_7 }],
+    [BetType.RUN_BOTTOM, { payout: settings.pay_8, commission: settings.discount_8 }],
+  ]);
 }
 
 function asNumber(value: number | string) {

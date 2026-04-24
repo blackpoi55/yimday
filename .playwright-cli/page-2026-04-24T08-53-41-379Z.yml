@@ -1,0 +1,664 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e27] [cursor=pointer]:
+    - img [ref=e28]
+  - alert [ref=e31]
+  - generic [ref=e32]:
+    - navigation [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - link "Control กบ" [ref=e36] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e38]
+            - generic [ref=e41]:
+              - generic [ref=e42]: Control
+              - generic [ref=e43]: กบ
+          - generic [ref=e44]:
+            - link "หน้าหลัก" [ref=e45] [cursor=pointer]:
+              - /url: /dashboard
+            - link "ตรวจหวย" [ref=e46] [cursor=pointer]:
+              - /url: /dashboard/winners
+            - link "ดูโพย" [ref=e47] [cursor=pointer]:
+              - /url: /dashboard/tickets
+            - link "สมาชิก" [ref=e48] [cursor=pointer]:
+              - /url: /dashboard/users
+            - link "คีย์โพย" [ref=e49] [cursor=pointer]:
+              - /url: /dashboard/tickets/new
+        - generic [ref=e50]:
+          - generic [ref=e52]: 15:53:40 วันศุกร์ที่ 24 เมษายน 2026
+          - button "ออกจากระบบ" [ref=e54] [cursor=pointer]:
+            - img [ref=e55]
+            - generic [ref=e58]: ออกจากระบบ
+    - main [ref=e59]:
+      - generic [ref=e61]:
+        - heading "รายชื่อสมาชิก" [level=1] [ref=e63]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - link "สมาชิกทั้งหมด" [ref=e66] [cursor=pointer]:
+              - /url: /dashboard/users
+            - link "เฉพาะสมาชิกของเรา" [ref=e67] [cursor=pointer]:
+              - /url: /dashboard/users?scope=mine
+            - link "เฉพาะสมาชิกที่มีโพย" [ref=e68] [cursor=pointer]:
+              - /url: /dashboard/users?scope=tickets
+          - table [ref=e70]:
+            - rowgroup [ref=e71]:
+              - row "ลำดับ ชื่อ-สกุล การจัดการ" [ref=e72]:
+                - columnheader "ลำดับ" [ref=e73]
+                - columnheader "ชื่อ-สกุล" [ref=e74]
+                - columnheader "การจัดการ" [ref=e75]
+            - rowgroup [ref=e76]:
+              - row "1 เกตุ อำนวย" [ref=e77]:
+                - cell "1" [ref=e78]
+                - cell "เกตุ อำนวย" [ref=e79]
+                - cell [ref=e80]:
+                  - generic [ref=e81]:
+                    - link [ref=e82] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=fdfc878f-62b2-49d1-9994-036b419890b3
+                      - img [ref=e83]
+                    - link [ref=e86] [cursor=pointer]:
+                      - /url: /dashboard/users/fdfc878f-62b2-49d1-9994-036b419890b3
+                      - img [ref=e87]
+              - row "2 แก้วบิ้งพระ" [ref=e90]:
+                - cell "2" [ref=e91]
+                - cell "แก้วบิ้งพระ" [ref=e92]
+                - cell [ref=e93]:
+                  - generic [ref=e94]:
+                    - link [ref=e95] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=4d74a37f-5746-457e-bd6b-91b38507fed9
+                      - img [ref=e96]
+                    - link [ref=e99] [cursor=pointer]:
+                      - /url: /dashboard/users/4d74a37f-5746-457e-bd6b-91b38507fed9
+                      - img [ref=e100]
+              - row "3 ขวัญ พล" [ref=e103]:
+                - cell "3" [ref=e104]
+                - cell "ขวัญ พล" [ref=e105]
+                - cell [ref=e106]:
+                  - generic [ref=e107]:
+                    - link [ref=e108] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=b2d22408-b1ec-4878-847d-0ac14cf979ed
+                      - img [ref=e109]
+                    - link [ref=e112] [cursor=pointer]:
+                      - /url: /dashboard/users/b2d22408-b1ec-4878-847d-0ac14cf979ed
+                      - img [ref=e113]
+              - row "4 คิด" [ref=e116]:
+                - cell "4" [ref=e117]
+                - cell "คิด" [ref=e118]
+                - cell [ref=e119]:
+                  - generic [ref=e120]:
+                    - link [ref=e121] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=dcae3b6f-8b27-44d9-9ab5-5490fd4b67fa
+                      - img [ref=e122]
+                    - link [ref=e125] [cursor=pointer]:
+                      - /url: /dashboard/users/dcae3b6f-8b27-44d9-9ab5-5490fd4b67fa
+                      - img [ref=e126]
+              - row "5 เจ๊น้อย" [ref=e129]:
+                - cell "5" [ref=e130]
+                - cell "เจ๊น้อย" [ref=e131]
+                - cell [ref=e132]:
+                  - generic [ref=e133]:
+                    - link [ref=e134] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=8ea44021-fa4e-432e-93f6-904010005010
+                      - img [ref=e135]
+                    - link [ref=e138] [cursor=pointer]:
+                      - /url: /dashboard/users/8ea44021-fa4e-432e-93f6-904010005010
+                      - img [ref=e139]
+              - row "6 เจ๊หงส์" [ref=e142]:
+                - cell "6" [ref=e143]
+                - cell "เจ๊หงส์" [ref=e144]
+                - cell [ref=e145]:
+                  - generic [ref=e146]:
+                    - link [ref=e147] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=c79c4f57-e34a-48ed-b20b-18d7479fb785
+                      - img [ref=e148]
+                    - link [ref=e151] [cursor=pointer]:
+                      - /url: /dashboard/users/c79c4f57-e34a-48ed-b20b-18d7479fb785
+                      - img [ref=e152]
+              - row "7 เจิม" [ref=e155]:
+                - cell "7" [ref=e156]
+                - cell "เจิม" [ref=e157]
+                - cell [ref=e158]:
+                  - generic [ref=e159]:
+                    - link [ref=e160] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=de35c285-0d82-427a-a95f-a9457a1eedeb
+                      - img [ref=e161]
+                    - link [ref=e164] [cursor=pointer]:
+                      - /url: /dashboard/users/de35c285-0d82-427a-a95f-a9457a1eedeb
+                      - img [ref=e165]
+              - row "8 เฉลียว" [ref=e168]:
+                - cell "8" [ref=e169]
+                - cell "เฉลียว" [ref=e170]
+                - cell [ref=e171]:
+                  - generic [ref=e172]:
+                    - link [ref=e173] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=4db0149d-721d-4749-a1b4-bc6c1cd66367
+                      - img [ref=e174]
+                    - link [ref=e177] [cursor=pointer]:
+                      - /url: /dashboard/users/4db0149d-721d-4749-a1b4-bc6c1cd66367
+                      - img [ref=e178]
+              - row "9 เสื่อย" [ref=e181]:
+                - cell "9" [ref=e182]
+                - cell "เสื่อย" [ref=e183]
+                - cell [ref=e184]:
+                  - generic [ref=e185]:
+                    - link [ref=e186] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=3350eb98-4ec0-480c-8605-ba35be464df7
+                      - img [ref=e187]
+                    - link [ref=e190] [cursor=pointer]:
+                      - /url: /dashboard/users/3350eb98-4ec0-480c-8605-ba35be464df7
+                      - img [ref=e191]
+              - row "10 ชบา" [ref=e194]:
+                - cell "10" [ref=e195]
+                - cell "ชบา" [ref=e196]
+                - cell [ref=e197]:
+                  - generic [ref=e198]:
+                    - link [ref=e199] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=8b377e7d-1329-4772-aa6e-2823b6548456
+                      - img [ref=e200]
+                    - link [ref=e203] [cursor=pointer]:
+                      - /url: /dashboard/users/8b377e7d-1329-4772-aa6e-2823b6548456
+                      - img [ref=e204]
+              - row "11 ชุน" [ref=e207]:
+                - cell "11" [ref=e208]
+                - cell "ชุน" [ref=e209]
+                - cell [ref=e210]:
+                  - generic [ref=e211]:
+                    - link [ref=e212] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=559ac5e2-4299-456e-a801-d350f4470cf1
+                      - img [ref=e213]
+                    - link [ref=e216] [cursor=pointer]:
+                      - /url: /dashboard/users/559ac5e2-4299-456e-a801-d350f4470cf1
+                      - img [ref=e217]
+              - row "12 เชื้อ" [ref=e220]:
+                - cell "12" [ref=e221]
+                - cell "เชื้อ" [ref=e222]
+                - cell [ref=e223]:
+                  - generic [ref=e224]:
+                    - link [ref=e225] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=73d177a8-5ba3-464f-963b-b9d8e605597c
+                      - img [ref=e226]
+                    - link [ref=e229] [cursor=pointer]:
+                      - /url: /dashboard/users/73d177a8-5ba3-464f-963b-b9d8e605597c
+                      - img [ref=e230]
+              - row "13 เตี้ย" [ref=e233]:
+                - cell "13" [ref=e234]
+                - cell "เตี้ย" [ref=e235]
+                - cell [ref=e236]:
+                  - generic [ref=e237]:
+                    - link [ref=e238] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=50f43d4e-b2cd-41cf-a14f-938e3578360c
+                      - img [ref=e239]
+                    - link [ref=e242] [cursor=pointer]:
+                      - /url: /dashboard/users/50f43d4e-b2cd-41cf-a14f-938e3578360c
+                      - img [ref=e243]
+              - row "14 ทัย" [ref=e246]:
+                - cell "14" [ref=e247]
+                - cell "ทัย" [ref=e248]
+                - cell [ref=e249]:
+                  - generic [ref=e250]:
+                    - link [ref=e251] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=68526092-db8b-41b1-b1bf-fb239d3b1a00
+                      - img [ref=e252]
+                    - link [ref=e255] [cursor=pointer]:
+                      - /url: /dashboard/users/68526092-db8b-41b1-b1bf-fb239d3b1a00
+                      - img [ref=e256]
+              - row "15 นกแก้ว" [ref=e259]:
+                - cell "15" [ref=e260]
+                - cell "นกแก้ว" [ref=e261]
+                - cell [ref=e262]:
+                  - generic [ref=e263]:
+                    - link [ref=e264] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=53846e06-6f43-48bb-b4e3-53c0216ce38d
+                      - img [ref=e265]
+                    - link [ref=e268] [cursor=pointer]:
+                      - /url: /dashboard/users/53846e06-6f43-48bb-b4e3-53c0216ce38d
+                      - img [ref=e269]
+              - row "16 น้อยหญิง" [ref=e272]:
+                - cell "16" [ref=e273]
+                - cell "น้อยหญิง" [ref=e274]
+                - cell [ref=e275]:
+                  - generic [ref=e276]:
+                    - link [ref=e277] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=1b085259-f89b-416e-8ab9-44914df3f4fc
+                      - img [ref=e278]
+                    - link [ref=e281] [cursor=pointer]:
+                      - /url: /dashboard/users/1b085259-f89b-416e-8ab9-44914df3f4fc
+                      - img [ref=e282]
+              - row "17 นา" [ref=e285]:
+                - cell "17" [ref=e286]
+                - cell "นา" [ref=e287]
+                - cell [ref=e288]:
+                  - generic [ref=e289]:
+                    - link [ref=e290] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=e0387b12-e8db-4df9-bae7-da6609bcb0d5
+                      - img [ref=e291]
+                    - link [ref=e294] [cursor=pointer]:
+                      - /url: /dashboard/users/e0387b12-e8db-4df9-bae7-da6609bcb0d5
+                      - img [ref=e295]
+              - row "18 นายหนุ่ย" [ref=e298]:
+                - cell "18" [ref=e299]
+                - cell "นายหนุ่ย" [ref=e300]
+                - cell [ref=e301]:
+                  - generic [ref=e302]:
+                    - link [ref=e303] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=22fc8c5f-b658-4cbd-848c-ab278a5a3acd
+                      - img [ref=e304]
+                    - link [ref=e307] [cursor=pointer]:
+                      - /url: /dashboard/users/22fc8c5f-b658-4cbd-848c-ab278a5a3acd
+                      - img [ref=e308]
+              - row "19 นิตบัวงาม" [ref=e311]:
+                - cell "19" [ref=e312]
+                - cell "นิตบัวงาม" [ref=e313]
+                - cell [ref=e314]:
+                  - generic [ref=e315]:
+                    - link [ref=e316] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=3038be6d-32a0-40b0-bd19-a740c3d3cf22
+                      - img [ref=e317]
+                    - link [ref=e320] [cursor=pointer]:
+                      - /url: /dashboard/users/3038be6d-32a0-40b0-bd19-a740c3d3cf22
+                      - img [ref=e321]
+              - row "20 นิต-ตี๋" [ref=e324]:
+                - cell "20" [ref=e325]
+                - cell "นิต-ตี๋" [ref=e326]
+                - cell [ref=e327]:
+                  - generic [ref=e328]:
+                    - link [ref=e329] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=94af4f92-3218-4f09-8e00-c9f3dfbd76c5
+                      - img [ref=e330]
+                    - link [ref=e333] [cursor=pointer]:
+                      - /url: /dashboard/users/94af4f92-3218-4f09-8e00-c9f3dfbd76c5
+                      - img [ref=e334]
+              - row "21 นิ่ม" [ref=e337]:
+                - cell "21" [ref=e338]
+                - cell "นิ่ม" [ref=e339]
+                - cell [ref=e340]:
+                  - generic [ref=e341]:
+                    - link [ref=e342] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=a5e3fec4-35a5-4020-ab04-4e36b72eb108
+                      - img [ref=e343]
+                    - link [ref=e346] [cursor=pointer]:
+                      - /url: /dashboard/users/a5e3fec4-35a5-4020-ab04-4e36b72eb108
+                      - img [ref=e347]
+              - row "22 บุชิ" [ref=e350]:
+                - cell "22" [ref=e351]
+                - cell "บุชิ" [ref=e352]
+                - cell [ref=e353]:
+                  - generic [ref=e354]:
+                    - link [ref=e355] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=1ab6e169-0b42-49e9-b698-614a6784af9f
+                      - img [ref=e356]
+                    - link [ref=e359] [cursor=pointer]:
+                      - /url: /dashboard/users/1ab6e169-0b42-49e9-b698-614a6784af9f
+                      - img [ref=e360]
+              - row "23 นุชาโลตัส" [ref=e363]:
+                - cell "23" [ref=e364]
+                - cell "นุชาโลตัส" [ref=e365]
+                - cell [ref=e366]:
+                  - generic [ref=e367]:
+                    - link [ref=e368] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=be174514-e7e9-4064-9d12-ae9d17c2faa4
+                      - img [ref=e369]
+                    - link [ref=e372] [cursor=pointer]:
+                      - /url: /dashboard/users/be174514-e7e9-4064-9d12-ae9d17c2faa4
+                      - img [ref=e373]
+              - row "24 บางระกำ" [ref=e376]:
+                - cell "24" [ref=e377]
+                - cell "บางระกำ" [ref=e378]
+                - cell [ref=e379]:
+                  - generic [ref=e380]:
+                    - link [ref=e381] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=7edfc029-7954-4a25-a021-027893089989
+                      - img [ref=e382]
+                    - link [ref=e385] [cursor=pointer]:
+                      - /url: /dashboard/users/7edfc029-7954-4a25-a021-027893089989
+                      - img [ref=e386]
+              - row "25 บุ๋ม" [ref=e389]:
+                - cell "25" [ref=e390]
+                - cell "บุ๋ม" [ref=e391]
+                - cell [ref=e392]:
+                  - generic [ref=e393]:
+                    - link [ref=e394] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=ddd6fa0b-a3c4-4a66-9549-2c403489d323
+                      - img [ref=e395]
+                    - link [ref=e398] [cursor=pointer]:
+                      - /url: /dashboard/users/ddd6fa0b-a3c4-4a66-9549-2c403489d323
+                      - img [ref=e399]
+              - row "26 เบนซ์" [ref=e402]:
+                - cell "26" [ref=e403]
+                - cell "เบนซ์" [ref=e404]
+                - cell [ref=e405]:
+                  - generic [ref=e406]:
+                    - link [ref=e407] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=5632d481-4638-4664-802d-d401c4d4e10f
+                      - img [ref=e408]
+                    - link [ref=e411] [cursor=pointer]:
+                      - /url: /dashboard/users/5632d481-4638-4664-802d-d401c4d4e10f
+                      - img [ref=e412]
+              - row "27 ป้าจืด" [ref=e415]:
+                - cell "27" [ref=e416]
+                - cell "ป้าจืด" [ref=e417]
+                - cell [ref=e418]:
+                  - generic [ref=e419]:
+                    - link [ref=e420] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=6b16a5b6-5b69-4ade-a66f-ab6a79c7487a
+                      - img [ref=e421]
+                    - link [ref=e424] [cursor=pointer]:
+                      - /url: /dashboard/users/6b16a5b6-5b69-4ade-a66f-ab6a79c7487a
+                      - img [ref=e425]
+              - row "28 ป้านอร์" [ref=e428]:
+                - cell "28" [ref=e429]
+                - cell "ป้านอร์" [ref=e430]
+                - cell [ref=e431]:
+                  - generic [ref=e432]:
+                    - link [ref=e433] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=ce20e63b-3f2c-454b-b491-747d9993d742
+                      - img [ref=e434]
+                    - link [ref=e437] [cursor=pointer]:
+                      - /url: /dashboard/users/ce20e63b-3f2c-454b-b491-747d9993d742
+                      - img [ref=e438]
+              - row "29 พัน" [ref=e441]:
+                - cell "29" [ref=e442]
+                - cell "พัน" [ref=e443]
+                - cell [ref=e444]:
+                  - generic [ref=e445]:
+                    - link [ref=e446] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=02e6a218-e9c1-4a41-a33f-104d1b47236e
+                      - img [ref=e447]
+                    - link [ref=e450] [cursor=pointer]:
+                      - /url: /dashboard/users/02e6a218-e9c1-4a41-a33f-104d1b47236e
+                      - img [ref=e451]
+              - row "30 ไพบุญย์" [ref=e454]:
+                - cell "30" [ref=e455]
+                - cell "ไพบุญย์" [ref=e456]
+                - cell [ref=e457]:
+                  - generic [ref=e458]:
+                    - link [ref=e459] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=f898291b-b350-4970-827e-cfaaea0476c7
+                      - img [ref=e460]
+                    - link [ref=e463] [cursor=pointer]:
+                      - /url: /dashboard/users/f898291b-b350-4970-827e-cfaaea0476c7
+                      - img [ref=e464]
+              - row "31 มนตรี" [ref=e467]:
+                - cell "31" [ref=e468]
+                - cell "มนตรี" [ref=e469]
+                - cell [ref=e470]:
+                  - generic [ref=e471]:
+                    - link [ref=e472] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=bd88dc5e-5efe-4b0b-9896-9b2a82adf560
+                      - img [ref=e473]
+                    - link [ref=e476] [cursor=pointer]:
+                      - /url: /dashboard/users/bd88dc5e-5efe-4b0b-9896-9b2a82adf560
+                      - img [ref=e477]
+              - row "32 ลับแล" [ref=e480]:
+                - cell "32" [ref=e481]
+                - cell "ลับแล" [ref=e482]
+                - cell [ref=e483]:
+                  - generic [ref=e484]:
+                    - link [ref=e485] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=c925da7b-14c1-4ade-a689-01e6c7c0044b
+                      - img [ref=e486]
+                    - link [ref=e489] [cursor=pointer]:
+                      - /url: /dashboard/users/c925da7b-14c1-4ade-a689-01e6c7c0044b
+                      - img [ref=e490]
+              - row "33 ลุงชาติ" [ref=e493]:
+                - cell "33" [ref=e494]
+                - cell "ลุงชาติ" [ref=e495]
+                - cell [ref=e496]:
+                  - generic [ref=e497]:
+                    - link [ref=e498] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=e6750f36-c410-4b64-abfc-777050920847
+                      - img [ref=e499]
+                    - link [ref=e502] [cursor=pointer]:
+                      - /url: /dashboard/users/e6750f36-c410-4b64-abfc-777050920847
+                      - img [ref=e503]
+              - row "34 ลุงดิ่ง" [ref=e506]:
+                - cell "34" [ref=e507]
+                - cell "ลุงดิ่ง" [ref=e508]
+                - cell [ref=e509]:
+                  - generic [ref=e510]:
+                    - link [ref=e511] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=5cdd8d3c-7937-46d2-ae7c-5774b2662f6c
+                      - img [ref=e512]
+                    - link [ref=e515] [cursor=pointer]:
+                      - /url: /dashboard/users/5cdd8d3c-7937-46d2-ae7c-5774b2662f6c
+                      - img [ref=e516]
+              - row "35 ลุงเนิน" [ref=e519]:
+                - cell "35" [ref=e520]
+                - cell "ลุงเนิน" [ref=e521]
+                - cell [ref=e522]:
+                  - generic [ref=e523]:
+                    - link [ref=e524] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=90f24c67-d1e1-43e9-acf5-8d1548c1249d
+                      - img [ref=e525]
+                    - link [ref=e528] [cursor=pointer]:
+                      - /url: /dashboard/users/90f24c67-d1e1-43e9-acf5-8d1548c1249d
+                      - img [ref=e529]
+              - row "36 ลูกน้ำ" [ref=e532]:
+                - cell "36" [ref=e533]
+                - cell "ลูกน้ำ" [ref=e534]
+                - cell [ref=e535]:
+                  - generic [ref=e536]:
+                    - link [ref=e537] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=942af153-82bb-4865-9478-98ef1d387da6
+                      - img [ref=e538]
+                    - link [ref=e541] [cursor=pointer]:
+                      - /url: /dashboard/users/942af153-82bb-4865-9478-98ef1d387da6
+                      - img [ref=e542]
+              - row "37 ลูกสาวเนิน" [ref=e545]:
+                - cell "37" [ref=e546]
+                - cell "ลูกสาวเนิน" [ref=e547]
+                - cell [ref=e548]:
+                  - generic [ref=e549]:
+                    - link [ref=e550] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=c1a137d3-10be-4831-9131-cddb4fd758f0
+                      - img [ref=e551]
+                    - link [ref=e554] [cursor=pointer]:
+                      - /url: /dashboard/users/c1a137d3-10be-4831-9131-cddb4fd758f0
+                      - img [ref=e555]
+              - row "38 ส้ม" [ref=e558]:
+                - cell "38" [ref=e559]
+                - cell "ส้ม" [ref=e560]
+                - cell [ref=e561]:
+                  - generic [ref=e562]:
+                    - link [ref=e563] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=d5a7e8f5-f139-463b-aa01-57b336dae0da
+                      - img [ref=e564]
+                    - link [ref=e567] [cursor=pointer]:
+                      - /url: /dashboard/users/d5a7e8f5-f139-463b-aa01-57b336dae0da
+                      - img [ref=e568]
+              - row "39 สมัย" [ref=e571]:
+                - cell "39" [ref=e572]
+                - cell "สมัย" [ref=e573]
+                - cell [ref=e574]:
+                  - generic [ref=e575]:
+                    - link [ref=e576] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=93e91a8b-a810-416e-a46e-345ee74cb5e9
+                      - img [ref=e577]
+                    - link [ref=e580] [cursor=pointer]:
+                      - /url: /dashboard/users/93e91a8b-a810-416e-a46e-345ee74cb5e9
+                      - img [ref=e581]
+              - row "40 หน่อย ต." [ref=e584]:
+                - cell "40" [ref=e585]
+                - cell "หน่อย ต." [ref=e586]
+                - cell [ref=e587]:
+                  - generic [ref=e588]:
+                    - link [ref=e589] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=7263bb7e-3c28-4ff6-a8e5-dcc13c600682
+                      - img [ref=e590]
+                    - link [ref=e593] [cursor=pointer]:
+                      - /url: /dashboard/users/7263bb7e-3c28-4ff6-a8e5-dcc13c600682
+                      - img [ref=e594]
+              - row "41 หมวย" [ref=e597]:
+                - cell "41" [ref=e598]
+                - cell "หมวย" [ref=e599]
+                - cell [ref=e600]:
+                  - generic [ref=e601]:
+                    - link [ref=e602] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=75a2e7a2-855e-4d03-a671-de04f1d34c51
+                      - img [ref=e603]
+                    - link [ref=e606] [cursor=pointer]:
+                      - /url: /dashboard/users/75a2e7a2-855e-4d03-a671-de04f1d34c51
+                      - img [ref=e607]
+              - row "42 หลอง" [ref=e610]:
+                - cell "42" [ref=e611]
+                - cell "หลอง" [ref=e612]
+                - cell [ref=e613]:
+                  - generic [ref=e614]:
+                    - link [ref=e615] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=e47734d3-9f91-46d6-bef8-f6d218aea8c3
+                      - img [ref=e616]
+                    - link [ref=e619] [cursor=pointer]:
+                      - /url: /dashboard/users/e47734d3-9f91-46d6-bef8-f6d218aea8c3
+                      - img [ref=e620]
+              - row "43 อ้อ" [ref=e623]:
+                - cell "43" [ref=e624]
+                - cell "อ้อ" [ref=e625]
+                - cell [ref=e626]:
+                  - generic [ref=e627]:
+                    - link [ref=e628] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=20edae18-8981-4897-b8fe-c182b9dfca69
+                      - img [ref=e629]
+                    - link [ref=e632] [cursor=pointer]:
+                      - /url: /dashboard/users/20edae18-8981-4897-b8fe-c182b9dfca69
+                      - img [ref=e633]
+              - row "44 แอ๋ว สอต." [ref=e636]:
+                - cell "44" [ref=e637]
+                - cell "แอ๋ว สอต." [ref=e638]
+                - cell [ref=e639]:
+                  - generic [ref=e640]:
+                    - link [ref=e641] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=4817e764-c820-433b-b29f-7e76a2bbac60
+                      - img [ref=e642]
+                    - link [ref=e645] [cursor=pointer]:
+                      - /url: /dashboard/users/4817e764-c820-433b-b29f-7e76a2bbac60
+                      - img [ref=e646]
+              - row "45 ฮ๊ะ" [ref=e649]:
+                - cell "45" [ref=e650]
+                - cell "ฮ๊ะ" [ref=e651]
+                - cell [ref=e652]:
+                  - generic [ref=e653]:
+                    - link [ref=e654] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=f1a29d92-8ad1-4483-a3ce-8293c2f5d953
+                      - img [ref=e655]
+                    - link [ref=e658] [cursor=pointer]:
+                      - /url: /dashboard/users/f1a29d92-8ad1-4483-a3ce-8293c2f5d953
+                      - img [ref=e659]
+              - row "46 เสียไช้" [ref=e662]:
+                - cell "46" [ref=e663]
+                - cell "เสียไช้" [ref=e664]
+                - cell [ref=e665]:
+                  - generic [ref=e666]:
+                    - link [ref=e667] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=801f6c8d-2856-4fea-ba62-2969de5fad52
+                      - img [ref=e668]
+                    - link [ref=e671] [cursor=pointer]:
+                      - /url: /dashboard/users/801f6c8d-2856-4fea-ba62-2969de5fad52
+                      - img [ref=e672]
+              - row "47 เสี่ยหนำ" [ref=e675]:
+                - cell "47" [ref=e676]
+                - cell "เสี่ยหนำ" [ref=e677]
+                - cell [ref=e678]:
+                  - generic [ref=e679]:
+                    - link [ref=e680] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=051c73eb-5ac1-48bd-9256-74737cd919fc
+                      - img [ref=e681]
+                    - link [ref=e684] [cursor=pointer]:
+                      - /url: /dashboard/users/051c73eb-5ac1-48bd-9256-74737cd919fc
+                      - img [ref=e685]
+              - row "48 ปทุมวัน" [ref=e688]:
+                - cell "48" [ref=e689]
+                - cell "ปทุมวัน" [ref=e690]
+                - cell [ref=e691]:
+                  - generic [ref=e692]:
+                    - link [ref=e693] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=97771ba3-a5b1-4d03-8283-eaeadd438344
+                      - img [ref=e694]
+                    - link [ref=e697] [cursor=pointer]:
+                      - /url: /dashboard/users/97771ba3-a5b1-4d03-8283-eaeadd438344
+                      - img [ref=e698]
+              - row "49 ตู่" [ref=e701]:
+                - cell "49" [ref=e702]
+                - cell "ตู่" [ref=e703]
+                - cell [ref=e704]:
+                  - generic [ref=e705]:
+                    - link [ref=e706] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=627500a1-d6f7-4c2e-a160-e72c64f21281
+                      - img [ref=e707]
+                    - link [ref=e710] [cursor=pointer]:
+                      - /url: /dashboard/users/627500a1-d6f7-4c2e-a160-e72c64f21281
+                      - img [ref=e711]
+              - row "50 ฮั่ว" [ref=e714]:
+                - cell "50" [ref=e715]
+                - cell "ฮั่ว" [ref=e716]
+                - cell [ref=e717]:
+                  - generic [ref=e718]:
+                    - link [ref=e719] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=deb8a00f-3d8c-4c06-9e70-faf0505d66dc
+                      - img [ref=e720]
+                    - link [ref=e723] [cursor=pointer]:
+                      - /url: /dashboard/users/deb8a00f-3d8c-4c06-9e70-faf0505d66dc
+                      - img [ref=e724]
+              - row "51 อ้วน" [ref=e727]:
+                - cell "51" [ref=e728]
+                - cell "อ้วน" [ref=e729]
+                - cell [ref=e730]:
+                  - generic [ref=e731]:
+                    - link [ref=e732] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=691c70ed-2d5e-49b8-8f25-0d7e7241c059
+                      - img [ref=e733]
+                    - link [ref=e736] [cursor=pointer]:
+                      - /url: /dashboard/users/691c70ed-2d5e-49b8-8f25-0d7e7241c059
+                      - img [ref=e737]
+              - row "52 แท่ง" [ref=e740]:
+                - cell "52" [ref=e741]
+                - cell "แท่ง" [ref=e742]
+                - cell [ref=e743]:
+                  - generic [ref=e744]:
+                    - link [ref=e745] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=c14d6809-34d2-4d5f-bd46-cadb48a2fcdf
+                      - img [ref=e746]
+                    - link [ref=e749] [cursor=pointer]:
+                      - /url: /dashboard/users/c14d6809-34d2-4d5f-bd46-cadb48a2fcdf
+                      - img [ref=e750]
+              - row "53 พันแก้ว" [ref=e753]:
+                - cell "53" [ref=e754]
+                - cell "พันแก้ว" [ref=e755]
+                - cell [ref=e756]:
+                  - generic [ref=e757]:
+                    - link [ref=e758] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=8f7da3a1-2e19-483b-af3a-ff3314141f70
+                      - img [ref=e759]
+                    - link [ref=e762] [cursor=pointer]:
+                      - /url: /dashboard/users/8f7da3a1-2e19-483b-af3a-ff3314141f70
+                      - img [ref=e763]
+              - row "54 หมู ต" [ref=e766]:
+                - cell "54" [ref=e767]
+                - cell "หมู ต" [ref=e768]
+                - cell [ref=e769]:
+                  - generic [ref=e770]:
+                    - link [ref=e771] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=a8f0ad63-91b8-4a3c-ab2b-a603ff2c4f13
+                      - img [ref=e772]
+                    - link [ref=e775] [cursor=pointer]:
+                      - /url: /dashboard/users/a8f0ad63-91b8-4a3c-ab2b-a603ff2c4f13
+                      - img [ref=e776]
+              - row "55 โหม่ง" [ref=e779]:
+                - cell "55" [ref=e780]
+                - cell "โหม่ง" [ref=e781]
+                - cell [ref=e782]:
+                  - generic [ref=e783]:
+                    - link [ref=e784] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=be870286-5945-48b7-814b-f1642d62a2e4
+                      - img [ref=e785]
+                    - link [ref=e788] [cursor=pointer]:
+                      - /url: /dashboard/users/be870286-5945-48b7-814b-f1642d62a2e4
+                      - img [ref=e789]
+              - row "56 นา เบ็นซ์" [ref=e792]:
+                - cell "56" [ref=e793]
+                - cell "นา เบ็นซ์" [ref=e794]
+                - cell [ref=e795]:
+                  - generic [ref=e796]:
+                    - link [ref=e797] [cursor=pointer]:
+                      - /url: /dashboard/users/check-period?customerId=7645e379-3065-4cd4-8f2b-f1005002e93a
+                      - img [ref=e798]
+                    - link [ref=e801] [cursor=pointer]:
+                      - /url: /dashboard/users/7645e379-3065-4cd4-8f2b-f1005002e93a
+                      - img [ref=e802]

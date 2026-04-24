@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - heading "LOGIN" [level=3] [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Username
+        - generic [ref=e12]:
+          - generic [ref=e13]: 👤
+          - textbox "Username" [ref=e14]:
+            - /placeholder: username
+      - generic [ref=e15]:
+        - generic [ref=e16]: Password
+        - generic [ref=e17]:
+          - generic [ref=e18]: 🔒
+          - textbox "Password" [ref=e19]
+      - button "Login" [ref=e21]
+  - button "Open Next.js Dev Tools" [ref=e27] [cursor=pointer]:
+    - img [ref=e28]

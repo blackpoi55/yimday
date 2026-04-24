@@ -6,12 +6,13 @@ import { Eye } from "lucide-react";
 import { BetType } from "@prisma/client";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import { Select } from "@/components/ui/select";
-import { betTypeLabels } from "@/lib/constants";
+import { getTicketLineLabel } from "@/lib/ticket-line";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type WinningItem = {
   id: string;
   betType: BetType;
+  displayType: string | null;
   number: string;
   amount: number;
   payoutRate: number;
@@ -23,7 +24,7 @@ type WinningTicket = {
   ticketId: string;
   displayName: string;
   customerName: string;
-  agentName: string;
+  entryLabel: string;
   createdAtLabel: string;
   subtotal: number;
   total: number;
@@ -38,6 +39,7 @@ type WinnerDraw = {
   drawName: string;
   notes: string | null;
   result: {
+    firstPrize: string;
     top3: string;
     top2: string;
     bottom3: string;
@@ -98,6 +100,7 @@ const resultToneClasses: Record<ResultTone, { card: string; value: string; badge
 };
 
 const resultFields: Array<{ key: keyof WinnerDraw["result"]; label: string; strong?: boolean; tone: ResultTone }> = [
+  { key: "firstPrize", label: "รางวัลที่ 1", strong: true, tone: "top" },
   { key: "top3", label: "3 ตัวบน", strong: true, tone: "top" },
   { key: "top2", label: "2 ตัวบน", tone: "top" },
   { key: "bottom2", label: "2 ตัวล่าง", strong: true, tone: "bottom" },
@@ -106,7 +109,11 @@ const resultFields: Array<{ key: keyof WinnerDraw["result"]; label: string; stro
   { key: "back3", label: "3 ท้าย", tone: "back" },
 ];
 
-function getToneFromBetType(betType: BetType): ResultTone {
+function getToneFromBetType(betType: BetType, displayType?: string | null): ResultTone {
+  if (displayType === "TWO_TOD") {
+    return "tod";
+  }
+
   switch (betType) {
     case BetType.TWO_TOP:
     case BetType.THREE_STRAIGHT:
@@ -132,10 +139,10 @@ function getHitBadges(ticket: WinningTicket) {
   const badges = new Map<string, { label: string; tone: ResultTone }>();
 
   for (const item of ticket.winningItems) {
-    const label = item.hitLabel || betTypeLabels[item.betType];
+    const label = item.hitLabel || getTicketLineLabel(item.betType, item.displayType);
     badges.set(`${item.betType}:${label}`, {
       label,
-      tone: getToneFromBetType(item.betType),
+      tone: getToneFromBetType(item.betType, item.displayType),
     });
   }
 
@@ -300,7 +307,7 @@ export function WinnersPageClient({ canManageResults, draws, scopeNotice }: Winn
                               <tr key={ticket.ticketId}>
                                 <td>
                                   <div className="font-medium">{ticket.customerName}</div>
-                                  <div className="text-xs text-muted-foreground">{ticket.agentName}</div>
+                                  <div className="text-xs text-muted-foreground">{ticket.entryLabel}</div>
                                 </td>
                                 <td>
                                   <div>{ticket.displayName}</div>
@@ -363,8 +370,8 @@ export function WinnersPageClient({ canManageResults, draws, scopeNotice }: Winn
                       <td>{activeTicket.customerName}</td>
                     </tr>
                     <tr>
-                      <th>พนักงาน</th>
-                      <td>{activeTicket.agentName}</td>
+                      <th>ผู้บันทึก</th>
+                      <td>{activeTicket.entryLabel}</td>
                     </tr>
                     <tr>
                       <th>วันที่บันทึก</th>
@@ -422,13 +429,13 @@ export function WinnersPageClient({ canManageResults, draws, scopeNotice }: Winn
                     </thead>
                     <tbody>
                       {activeTicket.winningItems.map((item) => {
-                        const tone = getToneFromBetType(item.betType);
+                        const tone = getToneFromBetType(item.betType, item.displayType);
 
                         return (
                         <tr key={item.id} className={resultToneClasses[tone].row}>
                           <td>
                             <span className={cn("rounded-full border px-2 py-1 text-xs font-medium", resultToneClasses[tone].badge)}>
-                              {betTypeLabels[item.betType]}
+                              {getTicketLineLabel(item.betType, item.displayType)}
                             </span>
                           </td>
                           <td className="font-mono text-base">{item.number}</td>

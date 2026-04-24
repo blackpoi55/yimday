@@ -8,6 +8,7 @@ import { Check, List, Pencil, Plus, Settings, User, X } from "lucide-react";
 import Swal from "sweetalert2";
 import { FormSubmit } from "@/components/ui/form-submit";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import {
@@ -162,15 +163,20 @@ function renderOwnerAgentSelect(agents: UserOption[], defaultValue = "") {
       <label className="legacy-form-label" htmlFor="ownerAgentId">
         พนักงานที่ดูแล
       </label>
-      <Select defaultValue={defaultValue} id="ownerAgentId" name="ownerAgentId">
-        <option value="">ไม่ระบุ</option>
-        <option value={SHARED_MEMBER_OWNER}>ทุกคน</option>
-        {agents.map((agent) => (
-          <option key={agent.id} value={agent.id}>
-            {agent.name}
-          </option>
-        ))}
-      </Select>
+      <SearchableSelect
+        defaultValue={defaultValue}
+        id="ownerAgentId"
+        name="ownerAgentId"
+        options={[
+          { value: "", label: "ไม่ระบุ" },
+          { value: SHARED_MEMBER_OWNER, label: "ทุกคน" },
+          ...agents.map((agent) => ({
+            value: agent.id,
+            label: agent.name,
+          })),
+        ]}
+        searchPlaceholder="ค้นหาพนักงาน"
+      />
     </div>
   );
 }
@@ -269,14 +275,16 @@ function AddUserForm({
             <label className="legacy-form-label" htmlFor="client-parent">
               หัวหน้าสาย
             </label>
-            <Select id="client-parent" name="parentMemberId" required>
-              <option value="">เลือกหัวหน้าสาย</option>
-              {mainMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              id="client-parent"
+              name="parentMemberId"
+              options={mainMembers.map((member) => ({
+                value: member.id,
+                label: member.name,
+              }))}
+              required
+              searchPlaceholder="ค้นหาหัวหน้าสาย"
+            />
           </div>
         </>
       ) : (
@@ -387,14 +395,17 @@ function EditUserForm({
             <label className="legacy-form-label" htmlFor={`edit-parent-${editingUser.id}`}>
               หัวหน้าสาย
             </label>
-            <Select defaultValue={editingUser.parentMemberId ?? ""} id={`edit-parent-${editingUser.id}`} name="parentMemberId" required>
-              <option value="">เลือกหัวหน้าสาย</option>
-              {mainMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              defaultValue={editingUser.parentMemberId ?? ""}
+              id={`edit-parent-${editingUser.id}`}
+              name="parentMemberId"
+              options={mainMembers.map((member) => ({
+                value: member.id,
+                label: member.name,
+              }))}
+              required
+              searchPlaceholder="ค้นหาหัวหน้าสาย"
+            />
           </div>
         </>
       ) : (

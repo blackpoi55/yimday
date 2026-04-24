@@ -5,6 +5,7 @@ import { TicketEntry } from "@/components/tickets/ticket-entry";
 import { requireSession } from "@/lib/auth";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
+import { compatSettingsFromPayoutProfiles } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
 import { prisma } from "@/lib/prisma";
 import { toNumber } from "@/lib/utils";
@@ -79,15 +80,28 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
     role: customer.role,
   }));
 
-  const customerSettings = Object.fromEntries(
-    await Promise.all(customers.map(async (customer) => [customer.id, await getUserCompatSettings(customer.id)] as const)),
-  );
-
   const serializedPayoutProfiles = payoutProfiles.map((item) => ({
     role: item.role,
     betType: item.betType,
+    payout: toNumber(item.payout),
     commission: toNumber(item.commission),
   }));
+  const customerSettings = Object.fromEntries(
+    await Promise.all(
+      customers.map(
+        async (customer) =>
+          [
+            customer.id,
+            await getUserCompatSettings(
+              customer.id,
+              compatSettingsFromPayoutProfiles(
+                serializedPayoutProfiles.filter((item) => item.role === customer.role),
+              ),
+            ),
+          ] as const,
+      ),
+    ),
+  );
 
   const defaultCustomerId =
     (requestedCustomerId &&

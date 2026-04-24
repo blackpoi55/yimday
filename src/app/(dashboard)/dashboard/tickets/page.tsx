@@ -1,9 +1,11 @@
-import { Role } from "@prisma/client";
+import { BetType, Role } from "@prisma/client";
 import { TicketsAdminClient } from "@/components/tickets/tickets-admin-client";
 import { TicketsPageClient } from "@/components/tickets/tickets-page-client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getTicketRecorderLabel, parseTicketEntryNote } from "@/lib/ticket-entry-source";
 import { buildTicketDisplayNameMap, getTicketDisplayName, sortByTicketDisplayName } from "@/lib/ticket-display";
+import { buildAgentRecordedTicketWhere } from "@/lib/ticket-scope";
 import { formatDateTime } from "@/lib/utils";
 
 type TicketsPageProps = {
@@ -68,14 +70,16 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
                       displayName: string;
                       customerId: string;
                       customerName: string;
-                      agentName: string;
+                      entryLabel: string;
                       subtotal: number;
+                      discount: number;
                       total: number;
                       createdAtLabel: string;
                       note: string | null;
                       items: {
                         id: string;
-                        betType: string;
+                        betType: BetType;
+                        displayType: string | null;
                         number: string;
                         amount: number;
                       }[];
@@ -95,20 +99,23 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
 
                 acc[ticket.customerId].subtotal += Number(ticket.subtotal);
                 acc[ticket.customerId].total += Number(ticket.total);
+                const parsedEntryNote = parseTicketEntryNote(ticket.note);
                 acc[ticket.customerId].tickets.push({
                   id: ticket.id,
                   code: ticket.code,
                   displayName: getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code),
                   customerId: ticket.customerId,
                   customerName: ticket.User_Ticket_customerIdToUser.name,
-                  agentName: ticket.User_Ticket_agentIdToUser.name,
+                  entryLabel: getTicketRecorderLabel(ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry),
                   subtotal: Number(ticket.subtotal),
+                  discount: Number(ticket.discount),
                   total: Number(ticket.total),
                   createdAtLabel: formatDateTime(ticket.createdAt),
-                  note: ticket.note,
+                  note: parsedEntryNote.displayNote,
                   items: ticket.BetItem.map((item) => ({
                     id: item.id,
                     betType: item.betType,
+                    displayType: item.displayType,
                     number: item.number,
                     amount: Number(item.amount),
                   })),
@@ -135,7 +142,7 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
     session.role === Role.ADMIN
       ? {}
       : session.role === Role.AGENT
-        ? { agentId: session.userId }
+        ? buildAgentRecordedTicketWhere(session.userId)
         : { customerId: session.userId };
 
   const where =
@@ -196,34 +203,39 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
     tickets: group.tickets
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .map((ticket) => ({
-      id: ticket.id,
-      drawId: ticket.drawId,
-      drawName: ticket.Draw.name,
-      displayName: getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code),
-      customerName: ticket.User_Ticket_customerIdToUser.name,
-      agentName: ticket.User_Ticket_agentIdToUser.name,
-      subtotal: Number(ticket.subtotal),
-      discount: Number(ticket.discount),
-      total: Number(ticket.total),
-      winAmount: Number(ticket.winAmount),
-      createdAtLabel: formatDateTime(ticket.createdAt),
-      note: ticket.note,
-      items: ticket.BetItem.map((item) => ({
-        id: item.id,
-        betType: item.betType,
-        number: item.number,
-        amount: Number(item.amount),
-        payoutRate: Number(item.payoutRate ?? 0),
-        winAmount: Number(item.winAmount),
-        hitLabel: item.hitLabel,
-      })),
-    })),
+      .map((ticket) => {
+        const parsedEntryNote = parseTicketEntryNote(ticket.note);
+
+        return {
+          id: ticket.id,
+          drawId: ticket.drawId,
+          drawName: ticket.Draw.name,
+          displayName: getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code),
+          customerName: ticket.User_Ticket_customerIdToUser.name,
+          entryLabel: getTicketRecorderLabel(ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry),
+          subtotal: Number(ticket.subtotal),
+          discount: Number(ticket.discount),
+          total: Number(ticket.total),
+          winAmount: Number(ticket.winAmount),
+          createdAtLabel: formatDateTime(ticket.createdAt),
+          note: parsedEntryNote.displayNote,
+          items: ticket.BetItem.map((item) => ({
+            id: item.id,
+            betType: item.betType,
+            displayType: item.displayType,
+            number: item.number,
+            amount: Number(item.amount),
+            payoutRate: Number(item.payoutRate ?? 0),
+            winAmount: Number(item.winAmount),
+            hitLabel: item.hitLabel,
+          })),
+        };
+      }),
   }));
 
   return (
     <TicketsPageClient
-      createTicketHref={session.role !== Role.CUSTOMER ? customerIdFilter ? `/dashboard/tickets/new?customerId=${customerIdFilter}` : "/dashboard/tickets/new" : null}
+      createTicketHref={session.role === Role.CUSTOMER ? "/dashboard/tickets/new" : customerIdFilter ? `/dashboard/tickets/new?customerId=${customerIdFilter}` : "/dashboard/tickets/new"}
       groupedTickets={groupedTickets}
       selectedCustomerName={selectedCustomer?.name ?? null}
       showClearFilter={Boolean(customerIdFilter)}

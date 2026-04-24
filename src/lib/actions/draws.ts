@@ -8,6 +8,29 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { buildCode, createDateTime, getString, toNumber } from "@/lib/utils";
 
+function normalizePrizeList(rawValue: string, digits: number, expectedCount: number, label: string) {
+  const tokens = rawValue
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => item.replace(/\D/g, ""));
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const invalid = tokens.find((item) => item.length !== digits);
+  if (invalid) {
+    throw new Error(`${label} ต้องเป็นตัวเลข ${digits} หลักทุกตัว`);
+  }
+
+  if (tokens.length !== expectedCount) {
+    throw new Error(`${label} ต้องกรอก ${expectedCount} เลข`);
+  }
+
+  return tokens.join("\n");
+}
+
 export async function createDrawAction(formData: FormData) {
   const session = await requireSession([Role.ADMIN]);
   const name = getString(formData.get("name"));
@@ -20,6 +43,21 @@ export async function createDrawAction(formData: FormData) {
 
   if (!name || !drawDate || !openDate || !openTime || !closeDate || !closeTime) {
     throw new Error("กรุณากรอกข้อมูลงวดให้ครบ");
+  }
+
+  const drawCount = await prisma.draw.count();
+
+  if (drawCount > 1) {
+    const oldestDraw = await prisma.draw.findFirst({
+      orderBy: {
+        drawDate: "asc",
+      },
+      select: {
+        name: true,
+      },
+    });
+
+    throw new Error(`กรุณาล้างงวดเก่า "${oldestDraw?.name ?? "-"}" ออกก่อน แล้วจึงเปิดงวดถัดไป`);
   }
 
   const openAt = createDateTime(openDate, openTime);
@@ -61,6 +99,88 @@ export async function createDrawAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/draws");
   revalidatePath("/dashboard/rates");
+}
+
+export async function clearOldDrawAction(formData: FormData) {
+  await requireSession([Role.ADMIN]);
+
+  const drawId = getString(formData.get("drawId"));
+
+  if (!drawId) {
+    throw new Error("ไม่พบงวดที่ต้องการล้าง");
+  }
+
+  const oldestDraw = await prisma.draw.findFirst({
+    orderBy: {
+      drawDate: "asc",
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  const latestDraw = await prisma.draw.findFirst({
+    orderBy: {
+      drawDate: "desc",
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!oldestDraw || !latestDraw || oldestDraw.id === latestDraw.id) {
+    throw new Error("ยังไม่มีงวดเก่าที่ล้างได้");
+  }
+
+  if (oldestDraw.id !== drawId) {
+    throw new Error("ต้องล้างงวดที่เก่ากว่าก่อน และเก็บงวดล่าสุดไว้");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.betItemSplit.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.blockedNumber.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.drawResult.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.betRate.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.ticket.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.draw.delete({
+      where: {
+        id: drawId,
+      },
+    });
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/draws");
+  revalidatePath("/dashboard/rates");
+  revalidatePath("/dashboard/results");
+  revalidatePath("/dashboard/winners");
+  revalidatePath("/dashboard/tickets");
 }
 
 export async function updateDrawAction(formData: FormData) {
@@ -166,27 +286,51 @@ export async function updateBetRateAction(formData: FormData) {
 export async function saveDrawResultAction(formData: FormData) {
   await requireSession([Role.ADMIN]);
   const drawId = getString(formData.get("drawId"));
+  const firstPrize = getString(formData.get("firstPrize"));
+  const firstPrizeAdjacent = getString(formData.get("firstPrizeAdjacent"));
+  const secondPrize = getString(formData.get("secondPrize"));
+  const thirdPrize = getString(formData.get("thirdPrize"));
+  const fourthPrize = getString(formData.get("fourthPrize"));
+  const fifthPrize = getString(formData.get("fifthPrize"));
   const top3 = getString(formData.get("top3"));
   const top2 = getString(formData.get("top2"));
   const bottom2 = getString(formData.get("bottom2"));
   const bottom3 = getString(formData.get("bottom3"));
   const front3 = getString(formData.get("front3"));
+  const front3Second = getString(formData.get("front3Second"));
   const back3 = getString(formData.get("back3"));
+  const back3Second = getString(formData.get("back3Second"));
   const notes = getString(formData.get("notes"));
 
-  if (!drawId || top3.length !== 3 || bottom2.length !== 2) {
+  const resolvedTop3 = firstPrize.length === 6 ? firstPrize.slice(-3) : top3;
+  const resolvedTop2 = firstPrize.length === 6 ? firstPrize.slice(-2) : top2 || resolvedTop3.slice(-2);
+
+  if (!drawId || firstPrize.length !== 6 || resolvedTop3.length !== 3 || bottom2.length !== 2) {
     throw new Error("กรุณากรอกผลรางวัลหลักให้ครบ");
   }
 
   const now = new Date();
+  const normalizedFirstPrizeAdjacent = normalizePrizeList(firstPrizeAdjacent, 6, 2, "เลขข้างเคียงรางวัลที่ 1");
+  const normalizedSecondPrize = normalizePrizeList(secondPrize, 6, 5, "รางวัลที่ 2");
+  const normalizedThirdPrize = normalizePrizeList(thirdPrize, 6, 10, "รางวัลที่ 3");
+  const normalizedFourthPrize = normalizePrizeList(fourthPrize, 6, 50, "รางวัลที่ 4");
+  const normalizedFifthPrize = normalizePrizeList(fifthPrize, 6, 100, "รางวัลที่ 5");
 
   const resultRecord = {
-    top3,
-    top2: top2 || top3.slice(-2),
+    firstPrize,
+    firstPrizeAdjacent: normalizedFirstPrizeAdjacent,
+    secondPrize: normalizedSecondPrize,
+    thirdPrize: normalizedThirdPrize,
+    fourthPrize: normalizedFourthPrize,
+    fifthPrize: normalizedFifthPrize,
+    top3: resolvedTop3,
+    top2: resolvedTop2,
     bottom2,
     bottom3: bottom3 || null,
     front3: front3 || null,
+    front3Second: front3Second || null,
     back3: back3 || null,
+    back3Second: back3Second || null,
     notes: notes || null,
     updatedAt: now,
   };

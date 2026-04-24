@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 import { WinnersPageClient } from "@/components/winners/winners-page-client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getTicketRecorderLabel, parseTicketEntryNote } from "@/lib/ticket-entry-source";
 import { buildTicketDisplayNameMap, getTicketDisplayName } from "@/lib/ticket-display";
 import { formatDateTime, toNumber } from "@/lib/utils";
 
@@ -75,36 +76,42 @@ export default async function WinnersPage() {
         drawName: draw.name,
         notes: draw.DrawResult?.notes ?? null,
         result: {
+          firstPrize: draw.DrawResult?.firstPrize ?? "-",
           top3: draw.DrawResult?.top3 ?? "-",
           top2: draw.DrawResult?.top2 ?? draw.DrawResult?.top3.slice(-2) ?? "-",
           bottom3: draw.DrawResult?.bottom3 ?? "-",
           bottom2: draw.DrawResult?.bottom2 ?? "-",
-          front3: draw.DrawResult?.front3 ?? "-",
-          back3: draw.DrawResult?.back3 ?? "-",
+          front3: [draw.DrawResult?.front3, draw.DrawResult?.front3Second].filter(Boolean).join(" / ") || "-",
+          back3: [draw.DrawResult?.back3, draw.DrawResult?.back3Second].filter(Boolean).join(" / ") || "-",
         },
         winnerCount: draw.Ticket.length,
         totalWinAmount: draw.Ticket.reduce((sum, ticket) => sum + toNumber(ticket.winAmount), 0),
-        winners: draw.Ticket.map((ticket) => ({
-          ticketId: ticket.id,
-          displayName: getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code),
-          customerName: ticket.User_Ticket_customerIdToUser.name,
-          agentName: ticket.User_Ticket_agentIdToUser.name,
-          createdAtLabel: formatDateTime(ticket.createdAt),
-          subtotal: toNumber(ticket.subtotal),
-          total: toNumber(ticket.total),
-          winAmount: toNumber(ticket.winAmount),
-          note: ticket.note,
-          hitSummary: [...new Set(ticket.BetItem.map((item) => item.hitLabel).filter((value): value is string => Boolean(value)))],
-          winningItems: ticket.BetItem.map((item) => ({
-            id: item.id,
-            betType: item.betType,
-            number: item.number,
-            amount: toNumber(item.amount),
-            payoutRate: toNumber(item.payoutRate),
-            hitLabel: item.hitLabel ?? "-",
-            winAmount: toNumber(item.winAmount),
-          })),
-        })),
+        winners: draw.Ticket.map((ticket) => {
+          const parsedEntryNote = parseTicketEntryNote(ticket.note);
+
+          return {
+            ticketId: ticket.id,
+            displayName: getTicketDisplayName(ticket.id, ticketDisplayNames, ticket.code),
+            customerName: ticket.User_Ticket_customerIdToUser.name,
+            entryLabel: getTicketRecorderLabel(ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry),
+            createdAtLabel: formatDateTime(ticket.createdAt),
+            subtotal: toNumber(ticket.subtotal),
+            total: toNumber(ticket.total),
+            winAmount: toNumber(ticket.winAmount),
+            note: parsedEntryNote.displayNote,
+            hitSummary: [...new Set(ticket.BetItem.map((item) => item.hitLabel).filter((value): value is string => Boolean(value)))],
+            winningItems: ticket.BetItem.map((item) => ({
+              id: item.id,
+              betType: item.betType,
+              displayType: item.displayType,
+              number: item.number,
+              amount: toNumber(item.amount),
+              payoutRate: toNumber(item.payoutRate),
+              hitLabel: item.hitLabel ?? "-",
+              winAmount: toNumber(item.winAmount),
+            })),
+          };
+        }),
       }))}
     />
   );

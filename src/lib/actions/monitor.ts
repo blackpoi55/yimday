@@ -48,6 +48,7 @@ export async function createBetSplitAction(formData: FormData): Promise<CreateBe
       : requestedType === "TWO_TOD"
         ? {
             betType: "TWO_TOP" as const,
+            displayType: "TWO_TOD",
             Ticket: { drawId },
           }
         : {
@@ -61,6 +62,7 @@ export async function createBetSplitAction(formData: FormData): Promise<CreateBe
               | "BACK_THREE"
               | "RUN_TOP"
               | "RUN_BOTTOM",
+            displayType: requestedType === "TWO_TOP" ? { not: "TWO_TOD" } : undefined,
             number: requestedNumber,
             Ticket: { drawId },
           };
@@ -96,7 +98,7 @@ export async function createBetSplitAction(formData: FormData): Promise<CreateBe
       }
 
       if (requestedType === "TWO_TOD") {
-        return canonicalDigits(item.number) === canonicalDigits(requestedNumber);
+        return item.displayType === "TWO_TOD" && canonicalDigits(item.number) === canonicalDigits(requestedNumber);
       }
 
       return true;

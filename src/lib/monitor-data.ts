@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getTicketRecorderLabel, parseTicketEntryNote } from "@/lib/ticket-entry-source";
+import { normalizeTicketDisplayType } from "@/lib/ticket-line";
 import { buildTicketDisplayNameMap, getTicketDisplayName } from "@/lib/ticket-display";
 import { toNumber } from "@/lib/utils";
 
@@ -9,6 +11,7 @@ export type MonitorDetailRow = {
   customerId: string;
   agentId: string;
   betType: string;
+  displayType: string | null;
   number: string;
   amount: number;
   customerName: string;
@@ -103,8 +106,9 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
     .filter((item) => item.remainingAmount > 0);
 
   const totalsByType = activeBetItems.reduce<Record<string, Record<string, number>>>((acc, item) => {
-    acc[item.betType] ??= {};
-    acc[item.betType][item.number] = (acc[item.betType][item.number] ?? 0) + item.remainingAmount;
+    const typeKey = normalizeTicketDisplayType(item.betType, item.displayType);
+    acc[typeKey] ??= {};
+    acc[typeKey][item.number] = (acc[typeKey][item.number] ?? 0) + item.remainingAmount;
     return acc;
   }, {});
 
@@ -117,7 +121,7 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
     }, {});
 
   const twoTodTotals = activeBetItems
-    .filter((item) => item.betType === "TWO_TOP" && item.number.length === 2)
+    .filter((item) => normalizeTicketDisplayType(item.betType, item.displayType) === "TWO_TOD")
     .reduce<Record<string, number>>((acc, item) => {
       const key = canonicalDigits(item.number);
       acc[key] = (acc[key] ?? 0) + item.remainingAmount;
@@ -128,8 +132,9 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
     acc[rate.betType] = rate.limitPerNumber ? Number(rate.limitPerNumber) : null;
     return acc;
   }, {});
+  limitByType.TWO_TOD = limitByType.TWO_TOP ?? null;
 
-  const overLimit = selectedDraw.BetRate.flatMap((rate) => {
+  const standardOverLimit: MonitorOverLimitItem[] = selectedDraw.BetRate.flatMap((rate) => {
     const limit = rate.limitPerNumber ? Number(rate.limitPerNumber) : null;
     if (!limit) {
       return [];
@@ -144,7 +149,22 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
         limit,
         overBy: total - limit,
       }));
-  }).sort((a, b) => b.overBy - a.overBy);
+  });
+  const twoTodOverLimit: MonitorOverLimitItem[] = Object.entries(totalsByType.TWO_TOD ?? {})
+    .filter(([, total]) => {
+      const limit = limitByType.TWO_TOD;
+      return typeof limit === "number" && total > limit;
+    })
+    .map(([number, total]) => ({
+      betType: "TWO_TOD",
+      number,
+      total,
+      limit: limitByType.TWO_TOD ?? 0,
+      overBy: total - (limitByType.TWO_TOD ?? 0),
+    }));
+  const overLimit: MonitorOverLimitItem[] = [...standardOverLimit, ...twoTodOverLimit].sort(
+    (a, b) => b.overBy - a.overBy,
+  );
 
   const ticketLabelMap = buildTicketDisplayNameMap(
     Array.from(
@@ -162,20 +182,25 @@ export async function getMonitorSnapshot(selectedDrawId?: string): Promise<Monit
     ),
   );
 
-  const detailRows = activeBetItems.map((item) => ({
-    id: item.id,
-    ticketId: item.Ticket.id,
-    customerId: item.Ticket.customerId,
-    agentId: item.Ticket.agentId,
-    betType: item.betType,
-    number: item.number,
-    amount: item.remainingAmount,
-    customerName: item.Ticket.User_Ticket_customerIdToUser.name,
-    ticketCode: item.Ticket.code,
-    ticketName: getTicketDisplayName(item.Ticket.id, ticketLabelMap, item.Ticket.code),
-    agentName: item.Ticket.User_Ticket_agentIdToUser.name,
-    createdAt: item.createdAt.toISOString(),
-  }));
+  const detailRows = activeBetItems.map((item) => {
+    const parsedEntryNote = parseTicketEntryNote(item.Ticket.note);
+
+    return {
+      id: item.id,
+      ticketId: item.Ticket.id,
+      customerId: item.Ticket.customerId,
+      agentId: item.Ticket.agentId,
+      betType: item.betType,
+      displayType: item.displayType,
+      number: item.number,
+      amount: item.remainingAmount,
+      customerName: item.Ticket.User_Ticket_customerIdToUser.name,
+      ticketCode: item.Ticket.code,
+      ticketName: getTicketDisplayName(item.Ticket.id, ticketLabelMap, item.Ticket.code),
+      agentName: getTicketRecorderLabel(item.Ticket.User_Ticket_agentIdToUser.name, parsedEntryNote.isSelfEntry),
+      createdAt: item.createdAt.toISOString(),
+    };
+  });
 
   return {
     draws: draws.map((draw) => ({ id: draw.id, name: draw.name, closeAt: draw.closeAt.toISOString(), status: draw.status })),

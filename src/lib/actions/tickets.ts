@@ -1,6 +1,6 @@
 "use server";
 
-import { Role, TicketStatus } from "@prisma/client";
+import { BetType, Role, TicketStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import {
   calculateTicketTotals,
@@ -12,10 +12,14 @@ import { requireSession } from "@/lib/auth";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
 import { isDrawAcceptingTickets } from "@/lib/draw-window";
 import { getUserCompatSettings } from "@/lib/php-compat-store";
-import { compatSettingsToCommissionEntries } from "@/lib/php-compat-shared";
+import { compatSettingsFromPayoutProfiles } from "@/lib/php-compat-shared";
 import { getPayoutProfiles } from "@/lib/payouts";
 import { prisma } from "@/lib/prisma";
+import { normalizeTicketDisplayType } from "@/lib/ticket-line";
+import { buildTicketEntryNote, parseTicketEntryNote } from "@/lib/ticket-entry-source";
+import { buildAgentRecordedTicketWhere } from "@/lib/ticket-scope";
 import { buildCode, getString } from "@/lib/utils";
+import { buildPricingMaps, getLinePricing } from "@/lib/ticket-pricing";
 
 export type TicketActionState = {
   error?: string;
@@ -23,6 +27,27 @@ export type TicketActionState = {
   message?: string;
   redirectTo?: string;
 };
+
+const customerAllowedDisplayTypes = new Set<string>([
+  "RUN_TOP",
+  "RUN_BOTTOM",
+  "TWO_TOP",
+  "TWO_BOTTOM",
+  "TWO_TOD",
+  "THREE_STRAIGHT",
+  "THREE_TOD",
+] as const);
+
+function serializePayoutProfiles(
+  profiles: Array<{ role: Role; betType: BetType; payout: unknown; commission: unknown }>,
+) {
+  return profiles.map((item) => ({
+    role: item.role,
+    betType: item.betType,
+    payout: Number(item.payout),
+    commission: Number(item.commission),
+  }));
+}
 
 async function parseAndValidateLines(linesJson: string) {
   let rawLines: TicketLineInput[] = [];
@@ -34,11 +59,12 @@ async function parseAndValidateLines(linesJson: string) {
   }
 
   if (!Array.isArray(rawLines) || rawLines.length === 0) {
-    return { error: "ยังไม่มีรายการโพย" } as const;
+    return { error: "กรุณาเพิ่มรายการโพยอย่างน้อย 1 รายการ" } as const;
   }
 
   const lines = rawLines.map((line) => ({
     betType: line.betType,
+    displayType: normalizeTicketDisplayType(line.betType, line.displayType),
     number: normalizeNumber(line.number, line.betType),
     amount: Number(line.amount),
   }));
@@ -57,11 +83,156 @@ async function parseAndValidateLines(linesJson: string) {
       (line.betType === "THREE_STRAIGHT" && blockedNumbers.threeTop.includes(line.number)) ||
       (line.betType === "THREE_BOTTOM" && blockedNumbers.threeBottom.includes(line.number))
     ) {
-      return { error: `เลข ${line.number} ถูกตั้งเป็นเลขเต็มแล้ว` } as const;
+      return { error: `เลข ${line.number} ถูกปิดรับในระบบแล้ว` } as const;
     }
   }
 
   return { lines } as const;
+}
+
+async function resolveTicketActorContext(session: Awaited<ReturnType<typeof requireSession>>, selectedCustomerId: string) {
+  let customerId = selectedCustomerId;
+  let agentId = session.userId;
+  let commissionRole: Role = Role.CUSTOMER;
+
+  if (session.role === Role.CUSTOMER) {
+    const customer = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        id: true,
+        role: true,
+        ownerAgentId: true,
+        Ticket_Ticket_customerIdToUser: {
+          select: {
+            agentId: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
+        ParentMember: {
+          select: {
+            ownerAgentId: true,
+            Ticket_Ticket_customerIdToUser: {
+              select: {
+                agentId: true,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    const resolvedAgentId =
+      customer?.ownerAgentId ??
+      customer?.ParentMember?.ownerAgentId ??
+      customer?.Ticket_Ticket_customerIdToUser[0]?.agentId ??
+      customer?.ParentMember?.Ticket_Ticket_customerIdToUser[0]?.agentId ??
+      session.ownerAgentId ??
+      null;
+
+    if (!customer || !resolvedAgentId) {
+      return { error: "ไม่พบหัวหน้าสายของสมาชิกนี้" } as const;
+    }
+
+    customerId = session.userId;
+    agentId = resolvedAgentId;
+    commissionRole = customer.role;
+  }
+
+  if (session.role === Role.AGENT) {
+    if (!customerId) {
+      return { error: "กรุณาเลือกลูกค้าที่ต้องการคีย์โพย" } as const;
+    }
+
+    const customer = await prisma.user.findFirst({
+      where: {
+        id: customerId,
+        ...buildAgentCustomerWhere(session.userId),
+      },
+    });
+
+    if (!customer) {
+      return { error: "ไม่พบลูกค้าที่อยู่ในความดูแลของคุณ" } as const;
+    }
+
+    commissionRole = customer.role;
+  }
+
+  if (session.role === Role.ADMIN) {
+    if (!customerId) {
+      return { error: "กรุณาเลือกลูกค้าที่ต้องการคีย์โพย" } as const;
+    }
+
+    const customer = await prisma.user.findFirst({
+      where: {
+        id: customerId,
+        role: Role.CUSTOMER,
+      },
+      select: {
+        id: true,
+        role: true,
+        ownerAgentId: true,
+        isSharedMember: true,
+        ParentMember: {
+          select: {
+            ownerAgentId: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      return { error: "ไม่พบลูกค้าที่เลือก" } as const;
+    }
+
+    if (!customer.ownerAgentId && !customer.isSharedMember && customer.ParentMember?.ownerAgentId === "__UNASSIGNED__") {
+      return { error: "ลูกค้ารายนี้ยังไม่ได้ผูกหัวหน้าสาย" } as const;
+    }
+
+    agentId = customer.ownerAgentId ?? customer.ParentMember?.ownerAgentId ?? session.userId;
+    commissionRole = customer.role;
+  }
+
+  return {
+    customerId,
+    agentId,
+    commissionRole,
+  } as const;
+}
+
+async function resolvePricingContext(customerId: string, role: Role) {
+  const payoutProfiles = serializePayoutProfiles(await getPayoutProfiles(role));
+  const customerCompatSettings = await getUserCompatSettings(
+    customerId,
+    compatSettingsFromPayoutProfiles(payoutProfiles),
+  );
+
+  return {
+    payoutProfiles,
+    customerCompatSettings,
+  };
+}
+
+function validateCustomerTicketSubmission(entryMode: string, lines: TicketLineInput[]) {
+  if (entryMode !== "NUMBER") {
+    return "สมาชิกทั่วไปคีย์โพยได้เฉพาะโหมดระบุตัวเลข";
+  }
+
+  for (const line of lines) {
+    const displayType = normalizeTicketDisplayType(line.betType, line.displayType);
+
+    if (!customerAllowedDisplayTypes.has(displayType)) {
+      return "สมาชิกทั่วไปคีย์โพยได้เฉพาะรายการเลขที่รองรับในโหมดระบุตัวเลข";
+    }
+  }
+
+  return null;
 }
 
 export async function createTicketAction(
@@ -71,11 +242,12 @@ export async function createTicketAction(
   const session = await requireSession([Role.ADMIN, Role.AGENT, Role.CUSTOMER]);
   const drawId = getString(formData.get("drawId"));
   const selectedCustomerId = getString(formData.get("customerId"));
+  const entryMode = getString(formData.get("entryMode"));
   const note = getString(formData.get("note"));
   const linesJson = getString(formData.get("linesJson"));
 
   if (!drawId || !linesJson) {
-    return { error: "กรุณาเลือกงวดและเพิ่มรายการคีย์โพย" };
+    return { error: "กรุณาเลือกงวดและเพิ่มรายการโพย" };
   }
 
   const parsed = await parseAndValidateLines(linesJson);
@@ -84,7 +256,13 @@ export async function createTicketAction(
     return { error: parsed.error };
   }
 
-  const { lines } = parsed;
+  if (session.role === Role.CUSTOMER) {
+    const customerSubmissionError = validateCustomerTicketSubmission(entryMode, parsed.lines);
+
+    if (customerSubmissionError) {
+      return { error: customerSubmissionError };
+    }
+  }
 
   const draw = await prisma.draw.findUnique({
     where: { id: drawId },
@@ -96,82 +274,25 @@ export async function createTicketAction(
   }
 
   if (!isDrawAcceptingTickets(draw)) {
-    return { error: "งวดนี้ยังไม่อยู่ในช่วงรับโพย หรือปิดรับโพยแล้ว" };
+    return { error: "งวดนี้ปิดรับโพยแล้ว" };
   }
 
-  let customerId = selectedCustomerId;
-  let agentId = session.userId;
-  let commissionRole: Role = Role.CUSTOMER;
-
-  if (session.role === Role.CUSTOMER) {
-    const customer = await prisma.user.findUnique({
-      where: { id: session.userId },
-    });
-
-    if (!customer?.ownerAgentId) {
-      return { error: "บัญชีลูกค้ายังไม่ได้ผูกกับพนักงาน" };
-    }
-
-    customerId = session.userId;
-    agentId = customer.ownerAgentId;
-    commissionRole = customer.role;
+  const actorContext = await resolveTicketActorContext(session, selectedCustomerId);
+  if ("error" in actorContext) {
+    return { error: actorContext.error };
   }
 
-  if (session.role === Role.AGENT) {
-    if (!customerId) {
-      return { error: "กรุณาเลือกลูกค้า" };
-    }
-
-    const customer = await prisma.user.findFirst({
-      where: {
-        id: customerId,
-        ...buildAgentCustomerWhere(session.userId),
-      },
-    });
-
-    if (!customer) {
-      return { error: "ไม่พบข้อมูลลูกค้าที่เลือก" };
-    }
-
-    commissionRole = customer.role;
-  }
-
-  if (session.role === Role.ADMIN) {
-    if (!customerId) {
-      return { error: "กรุณาเลือกลูกค้า" };
-    }
-
-    const customer = await prisma.user.findFirst({
-      where: {
-        id: customerId,
-        role: Role.CUSTOMER,
-      },
-    });
-
-    if (!customer) {
-      return { error: "ไม่พบข้อมูลลูกค้าที่เลือก" };
-    }
-
-    if (!customer.ownerAgentId && !customer.isSharedMember) {
-      return { error: "ลูกค้ารายนี้ยังไม่ได้ผูกกับพนักงาน จึงยังคีย์โพยแทนไม่ได้" };
-    }
-
-    agentId = customer.ownerAgentId ?? session.userId;
-    commissionRole = customer.role;
-  }
-
-  const payoutProfiles = await getPayoutProfiles(commissionRole);
-  const customerCompatSettings = await getUserCompatSettings(customerId);
-  const effectiveProfiles = [
-    ...payoutProfiles.map((item) => ({
-      role: item.role,
-      betType: item.betType,
-      commission: Number(item.commission),
-    })),
-    ...compatSettingsToCommissionEntries(customerCompatSettings, commissionRole),
-  ];
-
-  const totals = calculateTicketTotals(lines, draw.BetRate, effectiveProfiles, commissionRole);
+  const { customerId, agentId, commissionRole } = actorContext;
+  const { payoutProfiles, customerCompatSettings } = await resolvePricingContext(customerId, commissionRole);
+  const totals = calculateTicketTotals(
+    parsed.lines,
+    draw.BetRate,
+    payoutProfiles,
+    commissionRole,
+    customerCompatSettings,
+  );
+  const pricingMaps = buildPricingMaps(draw.BetRate, payoutProfiles, commissionRole, customerCompatSettings);
+  const rateMap = new Map(draw.BetRate.map((rate) => [rate.betType, rate]));
   const ticketId = crypto.randomUUID();
   const now = new Date();
 
@@ -183,25 +304,31 @@ export async function createTicketAction(
       agentId,
       drawId,
       status: TicketStatus.CONFIRMED,
-      note: note || null,
+      note: buildTicketEntryNote(note, session.role === Role.CUSTOMER),
       subtotal: totals.subtotal,
       discount: totals.discount,
       total: totals.total,
       updatedAt: now,
       BetItem: {
-        create: lines.map((line) => {
-          const rate = draw.BetRate.find((item) => item.betType === line.betType);
+        create: parsed.lines.map((line) => {
+          const rate = rateMap.get(line.betType);
 
           if (!rate?.isOpen) {
-            throw new Error(`ประเภท ${line.betType} ปิดรับแล้ว`);
+            throw new Error(`${line.betType} ยังไม่เปิดรับ`);
           }
+
+          const pricing = getLinePricing(line, pricingMaps, {
+            payout: Number(rate.payout),
+            commission: Number(rate.commission),
+          });
 
           return {
             id: crypto.randomUUID(),
             betType: line.betType,
+            displayType: line.displayType,
             number: line.number,
             amount: line.amount,
-            payoutRate: rate.payout,
+            payoutRate: pricing.payout,
           };
         }),
       },
@@ -229,7 +356,7 @@ export async function updateTicketAction(
   const linesJson = getString(formData.get("linesJson"));
 
   if (!ticketId || !linesJson) {
-    return { error: "ข้อมูลโพยไม่ครบ" };
+    return { error: "ข้อมูลการแก้ไขโพยไม่ครบ" };
   }
 
   const parsed = await parseAndValidateLines(linesJson);
@@ -244,7 +371,7 @@ export async function updateTicketAction(
         ? { id: ticketId }
         : {
             id: ticketId,
-            agentId: session.userId,
+            ...buildAgentRecordedTicketWhere(session.userId),
           },
     include: {
       Draw: {
@@ -261,25 +388,30 @@ export async function updateTicketAction(
   }
 
   if (!isDrawAcceptingTickets(ticket.Draw)) {
-    return { error: "งวดนี้ยังไม่อยู่ในช่วงรับโพย หรือปิดรับโพยแล้ว จึงแก้โพยไม่ได้" };
+    return { error: "งวดนี้ปิดรับโพยแล้ว ไม่สามารถแก้ไขได้" };
   }
 
   if (ticket.status !== TicketStatus.CONFIRMED) {
-    return { error: "แก้ไขได้เฉพาะโพยที่ยืนยันแล้วเท่านั้น" };
+    return { error: "โพยนี้ไม่สามารถแก้ไขได้" };
   }
 
   const commissionRole = ticket.User_Ticket_customerIdToUser.role;
-  const payoutProfiles = await getPayoutProfiles(commissionRole);
-  const customerCompatSettings = await getUserCompatSettings(ticket.customerId);
-  const effectiveProfiles = [
-    ...payoutProfiles.map((item) => ({
-      role: item.role,
-      betType: item.betType,
-      commission: Number(item.commission),
-    })),
-    ...compatSettingsToCommissionEntries(customerCompatSettings, commissionRole),
-  ];
-  const totals = calculateTicketTotals(parsed.lines, ticket.Draw.BetRate, effectiveProfiles, commissionRole);
+  const existingEntryNote = parseTicketEntryNote(ticket.note);
+  const { payoutProfiles, customerCompatSettings } = await resolvePricingContext(ticket.customerId, commissionRole);
+  const totals = calculateTicketTotals(
+    parsed.lines,
+    ticket.Draw.BetRate,
+    payoutProfiles,
+    commissionRole,
+    customerCompatSettings,
+  );
+  const pricingMaps = buildPricingMaps(
+    ticket.Draw.BetRate,
+    payoutProfiles,
+    commissionRole,
+    customerCompatSettings,
+  );
+  const rateMap = new Map(ticket.Draw.BetRate.map((rate) => [rate.betType, rate]));
   const now = new Date();
 
   try {
@@ -294,7 +426,7 @@ export async function updateTicketAction(
           id: ticketId,
         },
         data: {
-          note: note || null,
+          note: buildTicketEntryNote(note, existingEntryNote.isSelfEntry),
           subtotal: totals.subtotal,
           discount: totals.discount,
           total: totals.total,
@@ -303,18 +435,24 @@ export async function updateTicketAction(
           updatedAt: now,
           BetItem: {
             create: parsed.lines.map((line) => {
-              const rate = ticket.Draw.BetRate.find((item) => item.betType === line.betType);
+              const rate = rateMap.get(line.betType);
 
               if (!rate?.isOpen) {
-                throw new Error(`ประเภท ${line.betType} ปิดรับแล้ว`);
+                throw new Error(`${line.betType} ยังไม่เปิดรับ`);
               }
+
+              const pricing = getLinePricing(line, pricingMaps, {
+                payout: Number(rate.payout),
+                commission: Number(rate.commission),
+              });
 
               return {
                 id: crypto.randomUUID(),
                 betType: line.betType,
+                displayType: line.displayType,
                 number: line.number,
                 amount: line.amount,
-                payoutRate: rate.payout,
+                payoutRate: pricing.payout,
               };
             }),
           },

@@ -29,6 +29,7 @@ type DetailRow = {
   id: string;
   ticketId: string;
   betType: string;
+  displayType: string | null;
   number: string;
   amount: number;
   customerName: string;
@@ -150,12 +151,19 @@ function filterDetailRows(rows: DetailRow[], activeNumber: string, activeType: s
       }
 
       if (activeType === "TWO_TOD") {
-        return row.betType === "TWO_TOP" && canonicalDigits(row.number) === canonicalDigits(activeNumber);
+        return row.displayType === "TWO_TOD" && canonicalDigits(row.number) === canonicalDigits(activeNumber);
       }
 
-      return row.number === activeNumber && row.betType === activeType;
+      return row.number === activeNumber && row.betType === activeType && row.displayType !== "TWO_TOD";
     })
-    .sort((a, b) => b.amount - a.amount);
+    .sort((a, b) => {
+      const createdAtDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (createdAtDiff !== 0) {
+        return createdAtDiff;
+      }
+
+      return b.amount - a.amount;
+    });
 }
 
 function selectRowsForSplitAmount(rows: DetailRow[], targetAmount: number) {
@@ -294,14 +302,15 @@ export function MonitorClient({
         continue;
       }
 
-      const current = totals.get(row.betType) ?? {
-        label: row.betType,
+      const typeKey = row.displayType === "TWO_TOD" ? "TWO_TOD" : row.betType;
+      const current = totals.get(typeKey) ?? {
+        label: typeKey,
         total: 0,
-        type: row.betType,
+        type: typeKey,
       };
 
       current.total += row.amount;
-      totals.set(row.betType, current);
+      totals.set(typeKey, current);
     }
 
     return [...totals.values()].sort((a, b) => b.total - a.total);

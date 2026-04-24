@@ -1,0 +1,210 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e27] [cursor=pointer]:
+    - img [ref=e28]
+  - alert [ref=e31]
+  - generic [ref=e32]:
+    - navigation [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - link "Control กบ" [ref=e36] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e38]
+            - generic [ref=e41]:
+              - generic [ref=e42]: Control
+              - generic [ref=e43]: กบ
+          - generic [ref=e44]:
+            - link "หน้าหลัก" [ref=e45] [cursor=pointer]:
+              - /url: /dashboard
+            - link "ตรวจหวย" [ref=e46] [cursor=pointer]:
+              - /url: /dashboard/winners
+            - link "ดูโพย" [ref=e47] [cursor=pointer]:
+              - /url: /dashboard/tickets
+            - link "สมาชิก" [ref=e48] [cursor=pointer]:
+              - /url: /dashboard/users
+            - link "คีย์โพย" [active] [ref=e49] [cursor=pointer]:
+              - /url: /dashboard/tickets/new
+        - generic [ref=e50]:
+          - generic [ref=e52]: 15:54:25 วันศุกร์ที่ 24 เมษายน 2026
+          - button "ออกจากระบบ" [ref=e54] [cursor=pointer]:
+            - img [ref=e55]
+            - generic [ref=e58]: ออกจากระบบ
+    - main [ref=e59]:
+      - generic [ref=e805]:
+        - generic [ref=e806]:
+          - heading "คีย์โพย" [level=1] [ref=e808]
+          - link "กลับไปหน้าบิล" [ref=e809] [cursor=pointer]:
+            - /url: /dashboard/tickets
+            - button "กลับไปหน้าบิล" [ref=e810]
+        - generic [ref=e811]:
+          - generic [ref=e813]:
+            - generic [ref=e814]:
+              - heading "ข้อมูลการคีย์โพย" [level=2] [ref=e816]
+              - generic [ref=e818]:
+                - generic [ref=e819]:
+                  - generic [ref=e820]: งวด
+                  - combobox "งวด" [ref=e821]:
+                    - option "งวดวันที่ 30 เมษายน 2026" [selected]
+                - generic [ref=e822]:
+                  - generic [ref=e823]: ลูกค้า
+                  - combobox "ลูกค้า" [ref=e824]:
+                    - option "เกตุ อำนวย"
+                    - option "แก้วบิ้งพระ"
+                    - option "ขวัญ พล"
+                    - option "คิด"
+                    - option "เจ๊น้อย"
+                    - option "เจ๊หงส์"
+                    - option "เจิม"
+                    - option "เฉลียว"
+                    - option "ชบา"
+                    - option "ชุน"
+                    - option "เชื้อ"
+                    - option "ตู่"
+                    - option "เตี้ย"
+                    - option "ทัย"
+                    - option "แท่ง"
+                    - option "นกแก้ว"
+                    - option "น้อยหญิง"
+                    - option "นา"
+                    - option "นา เบ็นซ์" [selected]
+                    - option "นายหนุ่ย"
+                    - option "นิต-ตี๋"
+                    - option "นิตบัวงาม"
+                    - option "นิ่ม"
+                    - option "นุชาโลตัส"
+                    - option "บางระกำ"
+                    - option "บุชิ"
+                    - option "บุ๋ม"
+                    - option "เบนซ์"
+                    - option "ปทุมวัน"
+                    - option "ป้าจืด"
+                    - option "ป้านอร์"
+                    - option "พัน"
+                    - option "พันแก้ว"
+                    - option "ไพบุญย์"
+                    - option "มนตรี"
+                    - option "ลับแล"
+                    - option "ลุงชาติ"
+                    - option "ลุงดิ่ง"
+                    - option "ลุงเนิน"
+                    - option "ลูกน้ำ"
+                    - option "ลูกสาวเนิน"
+                    - option "ส้ม"
+                    - option "สมัย"
+                    - option "เสียไช้"
+                    - option "เสี่ยหนำ"
+                    - option "เสื่อย"
+                    - option "หน่อย ต."
+                    - option "หมวย"
+                    - option "หมู ต"
+                    - option "หลอง"
+                    - option "โหม่ง"
+                    - option "อ้วน"
+                    - option "อ้อ"
+                    - option "แอ๋ว สอต."
+                    - option "ฮ๊ะ"
+                    - option "ฮั่ว"
+            - generic [ref=e825]:
+              - heading "เลือกโหมดคีย์" [level=2] [ref=e827]
+              - generic [ref=e829]:
+                - button "ระบุตัวเลข" [ref=e830]:
+                  - generic [ref=e831]: ระบุตัวเลข
+                - button "Tool ช่วยคีย์" [ref=e832]:
+                  - generic [ref=e833]: Tool ช่วยคีย์
+                - button "คีย์ลัดแบบเร็ว" [ref=e834]:
+                  - generic [ref=e835]: คีย์ลัดแบบเร็ว
+                - button "ฟอร์แมต PHP" [ref=e836]:
+                  - generic [ref=e837]: ฟอร์แมต PHP
+            - generic [ref=e838]:
+              - heading "ระบุตัวเลข" [level=2] [ref=e840]
+              - generic [ref=e841]:
+                - spinbutton [ref=e842]
+                - generic [ref=e843]: กรอกเลข 1, 2 หรือ 3 หลัก เพื่อเลือกรูปแบบการซื้อ
+                - button "เพิ่มรายการ" [ref=e845]
+            - generic [ref=e846]:
+              - heading "รายการในโพย" [level=2] [ref=e848]
+              - table [ref=e851]:
+                - rowgroup [ref=e852]:
+                  - row "ประเภท เลข ยอดเงิน ข้อมูลการคีย์ จัดการ" [ref=e853]:
+                    - columnheader "ประเภท" [ref=e854]
+                    - columnheader "เลข" [ref=e855]
+                    - columnheader "ยอดเงิน" [ref=e856]
+                    - columnheader "ข้อมูลการคีย์" [ref=e857]
+                    - columnheader "จัดการ" [ref=e858]
+                - rowgroup [ref=e859]:
+                  - row "ยังไม่มีรายการในโพยนี้" [ref=e860]:
+                    - cell "ยังไม่มีรายการในโพยนี้" [ref=e861]
+            - generic [ref=e862]:
+              - heading "หมายเหตุ" [level=2] [ref=e864]
+              - textbox "หมายเหตุเพิ่มเติมในบิล" [ref=e866]
+            - button "ยืนยันบันทึกโพย" [ref=e868]
+          - generic [ref=e869]:
+            - generic [ref=e870]:
+              - heading "สรุปโพย" [level=2] [ref=e872]
+              - generic [ref=e873]:
+                - generic [ref=e874]:
+                  - generic [ref=e875]: งวด
+                  - generic [ref=e876]: งวดวันที่ 30 เมษายน 2026
+                - generic [ref=e877]:
+                  - generic [ref=e878]: ลูกค้า
+                  - generic [ref=e879]: นา เบ็นซ์
+                - generic [ref=e880]:
+                  - generic [ref=e881]: ปิดรับโพย
+                  - generic [ref=e882]: 30/4/2569 15:00:00
+                - separator [ref=e883]
+                - generic [ref=e884]:
+                  - generic [ref=e885]: ยอดแทงรวม
+                  - strong [ref=e886]: "0"
+                - generic [ref=e887]:
+                  - generic [ref=e888]: ส่วนลดรวม
+                  - strong [ref=e889]: "0"
+                - generic [ref=e890]:
+                  - generic [ref=e891]: สุทธิ
+                  - strong [ref=e892]: "0"
+            - generic [ref=e893]:
+              - heading "อัตราจ่ายและส่วนลด" [level=2] [ref=e895]
+              - generic [ref=e896]:
+                - generic [ref=e897]:
+                  - generic [ref=e898]:
+                    - generic [ref=e899]: 3 ตัวหน้า
+                    - generic [ref=e900]: จ่าย 450 / ส่วนลด 30%
+                  - generic [ref=e901]: เปิด
+                - generic [ref=e902]:
+                  - generic [ref=e903]:
+                    - generic [ref=e904]: 3 ตัวท้าย
+                    - generic [ref=e905]: จ่าย 450 / ส่วนลด 30%
+                  - generic [ref=e906]: เปิด
+                - generic [ref=e907]:
+                  - generic [ref=e908]:
+                    - generic [ref=e909]: วิ่งบน
+                    - generic [ref=e910]: จ่าย 3 / ส่วนลด 10%
+                  - generic [ref=e911]: เปิด
+                - generic [ref=e912]:
+                  - generic [ref=e913]:
+                    - generic [ref=e914]: วิ่งล่าง
+                    - generic [ref=e915]: จ่าย 4 / ส่วนลด 10%
+                  - generic [ref=e916]: เปิด
+                - generic [ref=e917]:
+                  - generic [ref=e918]:
+                    - generic [ref=e919]: 2 ตัวบน
+                    - generic [ref=e920]: จ่าย 65 / ส่วนลด 30%
+                  - generic [ref=e921]: เปิด
+                - generic [ref=e922]:
+                  - generic [ref=e923]:
+                    - generic [ref=e924]: 3 โต๊ด
+                    - generic [ref=e925]: จ่าย 0 / ส่วนลด 30%
+                  - generic [ref=e926]: เปิด
+                - generic [ref=e927]:
+                  - generic [ref=e928]:
+                    - generic [ref=e929]: 3 ตัวบน
+                    - generic [ref=e930]: จ่าย 0 / ส่วนลด 30%
+                  - generic [ref=e931]: เปิด
+                - generic [ref=e932]:
+                  - generic [ref=e933]:
+                    - generic [ref=e934]: 2 ตัวล่าง
+                    - generic [ref=e935]: จ่าย 65 / ส่วนลด 30%
+                  - generic [ref=e936]: เปิด
+                - generic [ref=e937]:
+                  - generic [ref=e938]:
+                    - generic [ref=e939]: 3 ตัวล่าง
+                    - generic [ref=e940]: จ่าย 100 / ส่วนลด 30%
+                  - generic [ref=e941]: เปิด

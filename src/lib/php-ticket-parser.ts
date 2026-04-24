@@ -1,8 +1,9 @@
 import { BetType } from "@prisma/client";
+import type { TicketDisplayType } from "@/lib/ticket-line";
 
 export type LegacyEntryMode = "TOP" | "BOTTOM" | "MIXED";
 
-export type LegacyDisplayType = BetType | "TWO_TOD";
+export type LegacyDisplayType = TicketDisplayType;
 
 export type ParsedPhpTicketLine = {
   betType: BetType;
