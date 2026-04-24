@@ -494,3 +494,134 @@
     height: 14px;
   }
 }
+
+@media screen {
+  .report-a4-page {
+    width: min(210mm, 100%);
+    min-height: 297mm;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  .report-a4-shell {
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  .report-a4-page {
+    width: 194mm;
+    min-height: 281mm;
+    margin: 0 auto;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .report-a4-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-a4-hero {
+    padding: 6mm 7mm !important;
+  }
+
+  .report-a4-hero-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.2fr) minmax(72mm, 0.8fr);
+    gap: 4mm !important;
+    align-items: start;
+  }
+
+  .report-a4-intro {
+    display: none;
+  }
+
+  .report-a4-hero h1 {
+    margin-top: 3mm !important;
+    font-size: 28px !important;
+    line-height: 1.15 !important;
+  }
+
+  .report-a4-meta-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.5mm !important;
+    min-width: 0 !important;
+  }
+
+  .report-a4-meta-grid > div {
+    padding: 3mm !important;
+    border-radius: 4mm !important;
+  }
+
+  .report-a4-metrics {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2.5mm !important;
+    padding: 4mm 7mm !important;
+  }
+
+  .report-a4-metric-card {
+    padding: 3mm !important;
+    border-radius: 4mm !important;
+    box-shadow: none !important;
+  }
+
+  .report-a4-metric-card > div:first-child {
+    font-size: 11px !important;
+  }
+
+  .report-a4-metric-card > div:last-child {
+    margin-top: 2mm !important;
+    font-size: 24px !important;
+    line-height: 1.1 !important;
+  }
+
+  .report-a4-content {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.72fr);
+    gap: 3mm !important;
+    padding: 4mm 7mm !important;
+    align-items: start;
+  }
+
+  .report-a4-column {
+    gap: 3mm !important;
+  }
+
+  .report-a4-page h2 {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  .report-a4-page p,
+  .report-a4-page span,
+  .report-a4-page div,
+  .report-a4-page td,
+  .report-a4-page th {
+    line-height: 1.35 !important;
+  }
+
+  .report-a4-page table {
+    font-size: 12px !important;
+  }
+
+  .report-a4-page th,
+  .report-a4-page td {
+    padding: 2.2mm 2.5mm !important;
+  }
+}

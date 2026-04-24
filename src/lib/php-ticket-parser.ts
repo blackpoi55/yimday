@@ -127,6 +127,19 @@ function parseTopBody(body: string, source: string): ParsedPhpTicketLine[] | Par
     return [createLine(BetType.TWO_TOP, sortDigits(twoTodMatch[1]), amount, source, "TWO_TOD")];
   }
 
+  const twoTopTodMatch = body.match(/^(\d{2})=(\d+(?:\.\d+)?)\*(\d+(?:\.\d+)?)$/);
+  if (twoTopTodMatch) {
+    const topAmount = parseAmount(twoTopTodMatch[2]);
+    const todAmount = parseAmount(twoTopTodMatch[3]);
+    if (!topAmount || !todAmount) {
+      return { error: `เธเธณเธเธงเธเน€เธเธดเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ: ${source}` };
+    }
+    return [
+      createLine(BetType.TWO_TOP, twoTopTodMatch[1], topAmount, source),
+      createLine(BetType.TWO_TOP, sortDigits(twoTopTodMatch[1]), todAmount, source, "TWO_TOD"),
+    ];
+  }
+
   const twoTopMatch = body.match(/^(\d{2})=(\d+(?:\.\d+)?)$/);
   if (twoTopMatch) {
     const amount = parseAmount(twoTopMatch[2]);

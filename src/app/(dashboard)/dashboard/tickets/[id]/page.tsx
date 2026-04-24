@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Role } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
@@ -61,6 +62,9 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               {ticket.Draw.name} | ลูกค้า {ticket.User_Ticket_customerIdToUser.name} | พนักงาน {ticket.User_Ticket_agentIdToUser.name}
             </p>
           </div>
+          <Link className="legacy-btn-default" href={`/reports/tickets/${ticket.id}?print=1`} rel="noreferrer" target="_blank">
+            PDF
+          </Link>
         </div>
         <div className="panel-body">
           <div className="legacy-grid-2-even">

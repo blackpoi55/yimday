@@ -193,7 +193,10 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
   ).map((group) => ({
     drawId: group.drawId,
     drawName: group.drawName,
-    tickets: sortByTicketDisplayName(group.tickets, ticketDisplayNames).map((ticket) => ({
+    tickets: group.tickets
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((ticket) => ({
       id: ticket.id,
       drawId: ticket.drawId,
       drawName: ticket.Draw.name,
@@ -224,12 +227,6 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
       groupedTickets={groupedTickets}
       selectedCustomerName={selectedCustomer?.name ?? null}
       showClearFilter={Boolean(customerIdFilter)}
-      summary={{
-        ticketCount: tickets.length,
-        subtotal: tickets.reduce((sum, ticket) => sum + Number(ticket.subtotal), 0),
-        total: tickets.reduce((sum, ticket) => sum + Number(ticket.total), 0),
-        winAmount: tickets.reduce((sum, ticket) => sum + Number(ticket.winAmount), 0),
-      }}
     />
   );
 }

@@ -64,6 +64,13 @@ type PreviewGroup = {
   items: LocalLine[];
 };
 
+type TicketListSummaryRow = {
+  key: string;
+  label: string;
+  count: number;
+  totalAmount: number;
+};
+
 const initialState: TicketActionState = {};
 
 const displayTypeLabels: Record<LegacyDisplayType, string> = {
@@ -120,19 +127,166 @@ const helperTypes: Array<{
 
 const helperAmountPresets = [50, 100, 200, 300, 500, 1000];
 
-type EntryMode = "HELPER" | "QUICK" | "PHP";
+type EntryMode = "HELPER" | "NUMBER" | "QUICK" | "PHP";
 
 const entryModeOptions: Array<{
   key: EntryMode;
   label: string;
 }> = [
+  { key: "NUMBER", label: "ระบุตัวเลข" },
   { key: "HELPER", label: "Tool ช่วยคีย์" },
   { key: "QUICK", label: "คีย์ลัดแบบเร็ว" },
   { key: "PHP", label: "ฟอร์แมต PHP" },
 ];
 
+const phpFormatExamples = [
+  {
+    title: "คีย์บน",
+    items: [
+      { code: "บ:5=500", meaning: "วิ่งบน" },
+      { code: "บ:80=500", meaning: "2 ตัวบน" },
+      { code: "บ:80=*500", meaning: "คู่โต๊ด" },
+      { code: "บ:80=500*500", meaning: "2 ตัวบน + คู่โต๊ด" },
+      { code: "บ:123=500", meaning: "3 ตัวบน" },
+      { code: "บ:123*500", meaning: "3 โต๊ด" },
+      { code: "บ:123=500*500", meaning: "3 ตัวบน + 3 โต๊ด" },
+      { code: "บ:123*=500", meaning: "3 ตัวบนกลับ 6 กลับ" },
+    ],
+  },
+  {
+    title: "คีย์ล่าง",
+    items: [
+      { code: "ล:6=500", meaning: "วิ่งล่าง" },
+      { code: "ล:80=500", meaning: "2 ตัวล่าง" },
+      { code: "ล:80=500*300", meaning: "2 ตัวล่างแยกตรง/กลับ" },
+      { code: "ล:123=500", meaning: "3 ตัวล่าง" },
+      { code: "ล:123*=500", meaning: "3 ตัวล่างกลับ 6 กลับ" },
+    ],
+  },
+  {
+    title: "คีย์บนล่าง",
+    items: [
+      { code: "บล:5=500", meaning: "วิ่งบน + วิ่งล่าง" },
+      { code: "บล:80=500", meaning: "2 บน + 2 ล่าง เท่ากัน" },
+      { code: "บล:80=500/300", meaning: "2 บน / 2 ล่าง คนละยอด" },
+      { code: "บล:80=500*300", meaning: "2 บน / 2 ล่างกลับ" },
+      { code: "บล:123=500", meaning: "3 บน + 3 ล่าง เท่ากัน" },
+      { code: "บล:123=500/300", meaning: "3 บน / 3 ล่าง คนละยอด" },
+      { code: "บล:123=500*300/200", meaning: "3 บน + 3 โต๊ด + 3 ล่าง" },
+      { code: "บล:123*=500", meaning: "3 บนกลับ + 3 ล่างกลับ" },
+    ],
+  },
+] as const;
+
+const quickFormatExamples = [
+  {
+    title: "คีย์บน",
+    items: [
+      { code: "5=100", meaning: "วิ่งบน" },
+      { code: "80=100", meaning: "2 ตัวบน" },
+      { code: "123=100", meaning: "3 ตัวบน" },
+      { code: "123*50", meaning: "3 โต๊ด" },
+      { code: "123=100*50", meaning: "3 ตัวบน + 3 โต๊ด" },
+      { code: "123*=10", meaning: "3 ตัวบนกลับ 6 กลับ" },
+      { code: "5=19*10", meaning: "19 ประตูบน" },
+    ],
+  },
+  {
+    title: "คีย์ล่าง",
+    items: [
+      { code: "4=100", meaning: "วิ่งล่าง" },
+      { code: "45=100", meaning: "2 ตัวล่าง" },
+      { code: "45=100/50", meaning: "2 ตัวล่างตรง/กลับ" },
+      { code: "456=100", meaning: "3 ตัวล่าง" },
+      { code: "456*=10", meaning: "3 ตัวล่างกลับ 6 กลับ" },
+      { code: "5=19*10", meaning: "19 ประตูล่าง" },
+    ],
+  },
+  {
+    title: "คีย์บน+ล่าง",
+    items: [
+      { code: "12=100", meaning: "2 บน + 2 ล่าง เท่ากัน" },
+      { code: "12=100/50", meaning: "2 บน / 2 ล่าง คนละยอด" },
+      { code: "123=100", meaning: "3 บน + 3 ล่าง เท่ากัน" },
+      { code: "123=100/50", meaning: "3 บน / 3 ล่าง คนละยอด" },
+      { code: "123=100*50/30", meaning: "3 บน + 3 โต๊ด + 3 ล่าง" },
+      { code: "123*=10", meaning: "3 บนกลับ + 3 ล่างกลับ" },
+    ],
+  },
+] as const;
+
+type NumberEntryOption = {
+  key: string;
+  label: string;
+  buildLines: (number: string, amount: number) => LocalLine[];
+};
+
+function reverseDigits(value: string) {
+  return value.split("").reverse().join("");
+}
+
+function uniqueThreePermutations(value: string) {
+  if (value.length !== 3) {
+    return [value];
+  }
+
+  const results = new Set<string>();
+  const digits = value.split("");
+
+  for (let i = 0; i < digits.length; i += 1) {
+    for (let j = 0; j < digits.length; j += 1) {
+      if (j === i) {
+        continue;
+      }
+
+      for (let k = 0; k < digits.length; k += 1) {
+        if (k === i || k === j) {
+          continue;
+        }
+
+        results.add(`${digits[i]}${digits[j]}${digits[k]}`);
+      }
+    }
+  }
+
+  return [...results];
+}
+
+function nineteenTailNumbers(digit: string) {
+  const values = new Set<string>();
+
+  for (let i = 0; i <= 9; i += 1) {
+    if (`${i}` !== digit) {
+      values.add(`${digit}${i}`);
+      values.add(`${i}${digit}`);
+    }
+  }
+
+  return [...values];
+}
+
+function buildNumberEntrySource(label: string, number: string, amount: number) {
+  return `ระบุเลข:${number} ${label}=${amount}`;
+}
+
 function sortDigits(value: string) {
   return value.split("").sort().join("");
+}
+
+function createNumberEntryLine(
+  betType: BetType,
+  number: string,
+  amount: number,
+  label: string,
+  displayType: LegacyDisplayType = betType,
+): LocalLine {
+  return {
+    betType,
+    displayType,
+    number: displayType === "TWO_TOD" ? sortDigits(number) : number,
+    amount,
+    source: buildNumberEntrySource(label, number, amount),
+  };
 }
 
 function normalizeHelperNumber(value: string, type: LegacyDisplayType) {
@@ -186,6 +340,173 @@ function buildPreviewGroups(lines: LocalLine[]) {
     .filter((group) => group.items.length > 0);
 }
 
+function buildTicketListSummary(lines: LocalLine[]): TicketListSummaryRow[] {
+  const totals = new Map<string, TicketListSummaryRow>();
+
+  for (const line of lines) {
+    const key = line.displayType;
+    const label = displayTypeLabels[line.displayType] ?? betTypeLabels[line.betType];
+    const current = totals.get(key) ?? {
+      key,
+      label,
+      count: 0,
+      totalAmount: 0,
+    };
+
+    current.count += 1;
+    current.totalAmount += line.amount;
+    totals.set(key, current);
+  }
+
+  return previewOrder
+    .map((key) => totals.get(key))
+    .filter((item): item is TicketListSummaryRow => Boolean(item));
+}
+
+const numberEntryOptionsByDigits: Record<number, NumberEntryOption[]> = {
+  1: [
+    {
+      key: "RUN_TOP",
+      label: "วิ่งบน",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_TOP, number, amount, "วิ่งบน")],
+    },
+    {
+      key: "RUN_BOTTOM",
+      label: "วิ่งล่าง",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.RUN_BOTTOM, number, amount, "วิ่งล่าง")],
+    },
+    {
+      key: "TAIL19_TOP",
+      label: "19 หางบน",
+      buildLines: (number, amount) =>
+        nineteenTailNumbers(number).map((item) => createNumberEntryLine(BetType.TWO_TOP, item, amount, "19 หางบน")),
+    },
+    {
+      key: "TAIL19_BOTTOM",
+      label: "19 หางล่าง",
+      buildLines: (number, amount) =>
+        nineteenTailNumbers(number).map((item) => createNumberEntryLine(BetType.TWO_BOTTOM, item, amount, "19 หางล่าง")),
+    },
+  ],
+  2: [
+    {
+      key: "TWO_TOP",
+      label: "2 บน",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 บน")],
+    },
+    {
+      key: "TWO_BOTTOM",
+      label: "2 ล่าง",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, "2 ล่าง")],
+    },
+    {
+      key: "TWO_MIXED",
+      label: "2 บน + 2 ล่าง",
+      buildLines: (number, amount) => [
+        createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 บน + 2 ล่าง"),
+        createNumberEntryLine(BetType.TWO_BOTTOM, number, amount, "2 บน + 2 ล่าง"),
+      ],
+    },
+    {
+      key: "TWO_TOP_REVERSED",
+      label: "2 บนกลับ",
+      buildLines: (number, amount) => [
+        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, "2 บนกลับ"),
+      ],
+    },
+    {
+      key: "TWO_BOTTOM_REVERSED",
+      label: "2 ล่างกลับ",
+      buildLines: (number, amount) => [
+        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, "2 ล่างกลับ"),
+      ],
+    },
+    {
+      key: "TWO_REVERSED_MIXED",
+      label: "2 กลับ บน + ล่าง",
+      buildLines: (number, amount) => [
+        createNumberEntryLine(BetType.TWO_TOP, reverseDigits(number), amount, "2 กลับ บน + ล่าง"),
+        createNumberEntryLine(BetType.TWO_BOTTOM, reverseDigits(number), amount, "2 กลับ บน + ล่าง"),
+      ],
+    },
+    {
+      key: "TWO_TOD",
+      label: "2 โต๊ดบน",
+      buildLines: (number, amount) => [
+        createNumberEntryLine(BetType.TWO_TOP, number, amount, "2 โต๊ดบน", "TWO_TOD"),
+      ],
+    },
+  ],
+  3: [
+    {
+      key: "THREE_TOP",
+      label: "3 บน",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_STRAIGHT, number, amount, "3 บน")],
+    },
+    {
+      key: "THREE_TOD",
+      label: "3 โต๊ดบน",
+      buildLines: (number, amount) => [createNumberEntryLine(BetType.THREE_TOD, number, amount, "3 โต๊ดบน")],
+    },
+    {
+      key: "THREE_PERMUTATIONS_TOP",
+      label: "3,6 กลับบน",
+      buildLines: (number, amount) =>
+        uniqueThreePermutations(number).map((item) =>
+          createNumberEntryLine(BetType.THREE_STRAIGHT, item, amount, "3,6 กลับบน"),
+        ),
+    },
+  ],
+};
+
+function getNumberEntryOptions(number: string) {
+  const options = numberEntryOptionsByDigits[number.length] ?? [];
+
+  if (number.length === 2) {
+    const reversed = reverseDigits(number);
+
+    return options.filter((option) => {
+      if (
+        option.key === "TWO_TOP_REVERSED" ||
+        option.key === "TWO_BOTTOM_REVERSED" ||
+        option.key === "TWO_REVERSED_MIXED"
+      ) {
+        return reversed !== number;
+      }
+
+      return true;
+    });
+  }
+
+  if (number.length === 3) {
+    const permutations = uniqueThreePermutations(number);
+    const permutationCount = permutations.length;
+
+    return options.flatMap((option) => {
+      if (option.key !== "THREE_PERMUTATIONS_TOP") {
+        return [option];
+      }
+
+      if (permutationCount <= 1) {
+        return [];
+      }
+
+      return [
+        {
+          ...option,
+          label: `${permutationCount} กลับบน`,
+          buildLines: (_number: string, amount: number) =>
+            permutations.map((item) =>
+              createNumberEntryLine(BetType.THREE_STRAIGHT, item, amount, `${permutationCount} กลับบน`),
+            ),
+        },
+      ];
+    });
+  }
+
+  return options;
+}
+
 export function TicketEntry({
   draws,
   customers,
@@ -203,19 +524,26 @@ export function TicketEntry({
   const [state, action] = useActionState(mode === "edit" ? updateTicketAction : createTicketAction, initialState);
   const [selectedDrawId, setSelectedDrawId] = useState(defaultDrawId ?? draws[0]?.id ?? "");
   const [selectedCustomerId, setSelectedCustomerId] = useState(defaultCustomerId ?? customers[0]?.id ?? "");
-  const [entryMode, setEntryMode] = useState<EntryMode>("HELPER");
+  const [entryMode, setEntryMode] = useState<EntryMode>("NUMBER");
   const [helperType, setHelperType] = useState<LegacyDisplayType>("TWO_TOP");
   const [helperNumber, setHelperNumber] = useState("");
   const [helperAmount, setHelperAmount] = useState("");
   const [helperError, setHelperError] = useState("");
+  const [numberEntryNumber, setNumberEntryNumber] = useState("");
+  const [numberEntryAmounts, setNumberEntryAmounts] = useState<Record<string, string>>({});
+  const [numberEntryError, setNumberEntryError] = useState("");
   const [quickMode, setQuickMode] = useState<QuickEntryMode>("TOP");
   const [quickText, setQuickText] = useState("");
   const [quickError, setQuickError] = useState("");
   const [rawText, setRawText] = useState("");
   const [parseError, setParseError] = useState("");
+  const [quickHelpOpen, setQuickHelpOpen] = useState(false);
+  const [phpHelpOpen, setPhpHelpOpen] = useState(false);
   const [lines, setLines] = useState<LocalLine[]>(initialLines);
+  const [previewLines, setPreviewLines] = useState<LocalLine[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const helperNumberRef = useRef<HTMLInputElement | null>(null);
+  const numberEntryInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedDraw = useMemo(
     () => draws.find((draw) => draw.id === selectedDrawId) ?? draws[0],
@@ -260,7 +588,7 @@ export function TicketEntry({
     };
   }, [commissionMap, lines]);
 
-  const previewGroups = useMemo(() => buildPreviewGroups(lines), [lines]);
+  const previewGroups = useMemo(() => buildPreviewGroups(previewLines), [previewLines]);
   const helperConfig = useMemo(
     () => helperTypes.find((item) => item.key === helperType) ?? helperTypes[0]!,
     [helperType],
@@ -272,6 +600,11 @@ export function TicketEntry({
 
     return normalizedNumber && safeAmount > 0 ? buildHelperSource(helperType, normalizedNumber, safeAmount) : "";
   }, [helperAmount, helperNumber, helperType]);
+  const numberEntryOptions = useMemo(
+    () => getNumberEntryOptions(numberEntryNumber),
+    [numberEntryNumber],
+  );
+  const ticketListSummary = useMemo(() => buildTicketListSummary(lines), [lines]);
 
   useEffect(() => {
     if (state.error) {
@@ -301,7 +634,8 @@ export function TicketEntry({
     }
 
     setParseError("");
-    setLines(parsed.lines);
+    setPreviewLines(parsed.lines);
+    setLines((current) => [...current, ...parsed.lines]);
     setPreviewOpen(true);
   }
 
@@ -316,7 +650,12 @@ export function TicketEntry({
 
     setQuickError("");
     setParseError("");
-    setLines(parsed.lines.map((line) => ({ ...line, displayType: line.betType })));
+    const nextLines = parsed.lines.map((line) => ({ ...line, displayType: line.betType }));
+    setPreviewLines(nextLines);
+    setLines((current) => [
+      ...current,
+      ...nextLines,
+    ]);
     setPreviewOpen(true);
   }
 
@@ -335,18 +674,56 @@ export function TicketEntry({
     }
 
     setHelperError("");
-    setLines((current) => [
-      ...current,
-      {
-        betType: helperConfig.betType,
-        displayType: helperType,
-        number: normalizedNumber,
-        amount,
-        source: buildHelperSource(helperType, normalizedNumber, amount),
-      },
-    ]);
+    const nextLine = {
+      betType: helperConfig.betType,
+      displayType: helperType,
+      number: normalizedNumber,
+      amount,
+      source: buildHelperSource(helperType, normalizedNumber, amount),
+    };
+    setPreviewLines([nextLine]);
+    setLines((current) => [...current, nextLine]);
     setHelperNumber("");
     helperNumberRef.current?.focus();
+  }
+
+  function handleNumberEntryNumberChange(value: string) {
+    const normalized = value.replace(/\D/g, "").slice(0, 3);
+    const allowedKeys = new Set(getNumberEntryOptions(normalized).map((item) => item.key));
+
+    setNumberEntryNumber(normalized);
+    setNumberEntryError("");
+    setNumberEntryAmounts((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => allowedKeys.has(key))),
+    );
+  }
+
+  function addNumberEntryLines() {
+    const number = numberEntryNumber.replace(/\D/g, "").slice(0, 3);
+    const options = getNumberEntryOptions(number);
+
+    if (number.length < 1 || number.length > 3 || options.length === 0) {
+      setNumberEntryError("กรุณาระบุเลข 1 ถึง 3 หลัก");
+      return;
+    }
+
+    const generated = options.flatMap((option) => {
+      const amount = Number(numberEntryAmounts[option.key] ?? "");
+      return Number.isFinite(amount) && amount > 0 ? option.buildLines(number, amount) : [];
+    });
+
+    if (generated.length === 0) {
+      setNumberEntryError("กรุณากรอกจำนวนเงินอย่างน้อย 1 รายการ");
+      return;
+    }
+
+    setNumberEntryError("");
+    setPreviewLines(generated);
+    setLines((current) => [...current, ...generated]);
+    setPreviewOpen(true);
+    setNumberEntryAmounts({});
+    setNumberEntryNumber("");
+    numberEntryInputRef.current?.focus();
   }
 
   function removeLine(index: number) {
@@ -427,7 +804,7 @@ export function TicketEntry({
               <h2 className="text-lg font-medium">เลือกโหมดคีย์</h2>
             </div>
             <div className="panel-body space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-4">
                 {entryModeOptions.map((mode) => (
                   <button
                     key={mode.key}
@@ -442,6 +819,18 @@ export function TicketEntry({
                     <div className="text-sm font-medium">{mode.label}</div>
                   </button>
                 ))}
+                <button
+                  hidden
+                  className={`rounded-sm border px-4 py-3 text-left transition ${
+                    entryMode === "NUMBER"
+                      ? "border-primary bg-primary/10 text-primary shadow-sm"
+                      : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
+                  }`}
+                  onClick={() => setEntryMode("NUMBER")}
+                  type="button"
+                >
+                  <div className="text-sm font-medium">ระบุตัวเลข</div>
+                </button>
               </div>
             </div>
           </div>
@@ -541,9 +930,100 @@ export function TicketEntry({
           </div>
           ) : null}
 
+          {entryMode === "NUMBER" ? (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="text-lg font-medium">ระบุตัวเลข</h2>
+            </div>
+            <div className="panel-body space-y-4">
+              <Input
+                ref={numberEntryInputRef}
+                className="text-center text-2xl font-medium"
+                inputMode="numeric"
+                maxLength={3}
+                type="number"
+                placeholder="ระบุตัวเลข"
+                value={numberEntryNumber}
+                onChange={(event) => handleNumberEntryNumberChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addNumberEntryLines();
+                  }
+                }}
+              />
+
+              {numberEntryOptions.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 items-center gap-3 text-center text-base font-medium md:grid-cols-[minmax(0,1fr)_180px] md:text-lg">
+                    <div>ประเภท</div>
+                    <div>จำนวนเงิน</div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {numberEntryOptions.map((option) => (
+                      <div key={option.key} className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+                        <div
+                          className={`flex items-center justify-center rounded-sm border px-4 py-3 text-center text-sm font-medium transition ${
+                            numberEntryAmounts[option.key]
+                              ? "border-[#86d19f] bg-[#ecfff2] text-[#1f6f43]"
+                              : "border-border bg-muted/30"
+                          }`}
+                        >
+                          {option.label}
+                        </div>
+                        <Input
+                          className={
+                            numberEntryAmounts[option.key]
+                              ? "border-[#86d19f] bg-[#f7fff9] text-[#1f6f43]"
+                              : undefined
+                          }
+                          inputMode="decimal"
+                          type="number"
+                          placeholder="ระบุจำนวนเงิน"
+                          value={numberEntryAmounts[option.key] ?? ""}
+                          onChange={(event) => {
+                            setNumberEntryAmounts((current) => ({ ...current, [option.key]: event.target.value }));
+                            setNumberEntryError("");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addNumberEntryLines();
+                            }
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-sm border border-dashed border-border bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
+                  กรอกเลข 1, 2 หรือ 3 หลัก เพื่อเลือกรูปแบบการซื้อ
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button className="w-full justify-center" onClick={addNumberEntryLines} type="button">
+                  เพิ่มรายการ
+                </Button>
+              </div>
+
+              {numberEntryError ? (
+                <div className="rounded-sm border border-[#ebccd1] bg-[#f2dede] px-4 py-3 text-sm text-[#a94442]">
+                  {numberEntryError}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          ) : null}
+
           {entryMode === "QUICK" ? (
           <div className="panel">
             <div className="panel-header">
+              <Button className="order-2 shrink-0" onClick={() => setQuickHelpOpen(true)} size="sm" type="button" variant="outline">
+                วิธีกรอก
+              </Button>
               <h2 className="text-lg font-medium">คีย์ลัดแบบเร็ว</h2>
             </div>
             <div className="panel-body space-y-4">
@@ -595,6 +1075,9 @@ export function TicketEntry({
           {entryMode === "PHP" ? (
           <div className="panel">
             <div className="panel-header">
+              <Button className="order-2 shrink-0" onClick={() => setPhpHelpOpen(true)} size="sm" type="button" variant="outline">
+                วิธีกรอก
+              </Button>
               <h2 className="text-lg font-medium">คีย์ตามฟอร์แมต PHP</h2>
             </div>
             <div className="panel-body space-y-4">
@@ -609,6 +1092,12 @@ export function TicketEntry({
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={parseLegacyInput} type="button" variant="secondary">
                   ตรวจสอบและแยกรายการ
+                </Button>
+              </div>
+
+              <div className="hidden">
+                <Button onClick={() => setPhpHelpOpen(true)} type="button" variant="outline">
+                  วิธีกรอก
                 </Button>
               </div>
 
@@ -659,6 +1148,32 @@ export function TicketEntry({
                     )}
                   </tbody>
                 </table>
+                {ticketListSummary.length > 0 ? (
+                  <div className="border-t border-[#e2e8f0] bg-[linear-gradient(180deg,#fbfdff_0%,#f8fbff_100%)] px-4 py-4">
+                    <div className="mb-3 text-sm font-semibold text-[#42526b]">สรุปรายการในโพย</div>
+                    <div className="space-y-2 text-sm">
+                      {ticketListSummary.map((item) => (
+                        <div key={item.key} className="flex items-center justify-between gap-3 rounded-sm border border-[#e8eef5] bg-white px-3 py-2">
+                          <div className="min-w-0">
+                            <div className="font-medium">{item.label}</div>
+                            <div className="text-xs text-muted-foreground">{item.count} รายการ</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-muted-foreground">ราคารวม</div>
+                            <div className="font-semibold">{formatCurrency(item.totalAmount)}</div>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between rounded-sm border border-[#d7e3f5] bg-[#eef5ff] px-3 py-3 font-semibold text-[#1d4ed8]">
+                        <div>รวมทั้งหมด</div>
+                        <div className="text-right">
+                          <div className="text-xs font-medium text-[#4b6cb7]">ราคารวม</div>
+                          <div>{formatCurrency(totals.subtotal)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -780,6 +1295,92 @@ export function TicketEntry({
                   ))}
                 </tbody>
               </table>
+            </div>
+          ))}
+        </div>
+      </LegacyModal>
+
+      <LegacyModal
+        footer={
+          <div className="legacy-modal-actions">
+            <button className="legacy-btn-default" onClick={() => setQuickHelpOpen(false)} type="button">
+              ปิด
+            </button>
+          </div>
+        }
+        onClose={() => setQuickHelpOpen(false)}
+        open={quickHelpOpen}
+        size="lg"
+        title="วิธีกรอกคีย์ลัดแบบเร็ว"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            คีย์ได้หลายบรรทัดโดยไม่ต้องใส่ <span className="font-mono">บ:</span> หรือ <span className="font-mono">ล:</span> และให้เลือกโหมดด้านบนให้ตรงกับรูปแบบที่ต้องการ
+          </p>
+          {quickFormatExamples.map((section) => (
+            <div key={section.title} className="space-y-3">
+              <h5 className="text-base font-medium">{section.title}</h5>
+              <div className="overflow-hidden rounded-sm border border-border">
+                <table className="legacy-period-table">
+                  <thead>
+                    <tr>
+                      <th>ตัวอย่าง</th>
+                      <th>ความหมาย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {section.items.map((item) => (
+                      <tr key={`${section.title}-${item.code}`}>
+                        <td className="font-mono text-xs">{item.code}</td>
+                        <td>{item.meaning}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      </LegacyModal>
+
+      <LegacyModal
+        footer={
+          <div className="legacy-modal-actions">
+            <button className="legacy-btn-default" onClick={() => setPhpHelpOpen(false)} type="button">
+              ปิด
+            </button>
+          </div>
+        }
+        onClose={() => setPhpHelpOpen(false)}
+        open={phpHelpOpen}
+        size="lg"
+        title="วิธีกรอกฟอร์แมต PHP"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            ใส่ได้หลายบรรทัด โดยขึ้นต้นด้วย <span className="font-mono">บ:</span>, <span className="font-mono">ล:</span> หรือ <span className="font-mono">บล:</span>
+          </p>
+          {phpFormatExamples.map((section) => (
+            <div key={section.title} className="space-y-3">
+              <h5 className="text-base font-medium">{section.title}</h5>
+              <div className="overflow-hidden rounded-sm border border-border">
+                <table className="legacy-period-table">
+                  <thead>
+                    <tr>
+                      <th>ตัวอย่าง</th>
+                      <th>ความหมาย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {section.items.map((item) => (
+                      <tr key={`${section.title}-${item.code}`}>
+                        <td className="font-mono text-xs">{item.code}</td>
+                        <td>{item.meaning}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
         </div>
