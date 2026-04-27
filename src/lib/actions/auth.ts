@@ -20,11 +20,20 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
     };
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      username,
-    },
-  });
+  let user;
+
+  try {
+    user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+  } catch (error) {
+    console.error("loginAction database lookup failed", error);
+    return {
+      error: "ระบบเชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    };
+  }
 
   if (!user || !user.isActive) {
     return {
