@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { DrawStatus, Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { buildAgentCustomerWhere } from "@/lib/customer-scope";
@@ -39,7 +39,9 @@ export default async function CheckPeriodPage({ searchParams }: CheckPeriodPageP
     }),
     prisma.draw.findFirst({
       where: {
-        status: "OPEN",
+        status: {
+          in: [DrawStatus.OPEN, DrawStatus.UPCOMING],
+        },
         openAt: {
           lte: now,
         },

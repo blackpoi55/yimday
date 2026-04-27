@@ -478,8 +478,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         u.username AS "managerName",
         u."isActive"
       FROM "User" u
-      WHERE u.role = ${Role.AGENT}::"Role"
-      ORDER BY u."createdAt" ASC
+      WHERE u.role IN (${Role.ADMIN}::"Role", ${Role.AGENT}::"Role")
+      ORDER BY u.role ASC, u."createdAt" ASC
     `,
     prisma.user.findMany({
       where: {

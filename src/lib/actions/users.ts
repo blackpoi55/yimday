@@ -59,6 +59,18 @@ function parseMemberType(value: string) {
   return MemberType.MEMBER;
 }
 
+function parseRole(value: string) {
+  if (value === Role.ADMIN) {
+    return Role.ADMIN;
+  }
+
+  if (value === Role.AGENT) {
+    return Role.AGENT;
+  }
+
+  return Role.CUSTOMER;
+}
+
 function resolveCustomerShape({
   sessionRole,
   sessionUserId,
@@ -121,7 +133,7 @@ export async function createUserAction(
       return { ok: false, message: "กรุณากรอกชื่อ" };
     }
 
-    const role = session.role === Role.ADMIN ? requestedRole || Role.CUSTOMER : Role.CUSTOMER;
+    const role = session.role === Role.ADMIN ? parseRole(requestedRole) : Role.CUSTOMER;
 
     if (role === Role.ADMIN && session.role !== Role.ADMIN) {
       return { ok: false, message: "ไม่มีสิทธิ์สร้างผู้ดูแลระบบ" };
@@ -257,6 +269,7 @@ export async function updateUserProfileAction(
     const name = getString(formData.get("name"));
     const username = getString(formData.get("username"));
     const phone = getString(formData.get("phone"));
+    const requestedRole = getString(formData.get("role"));
     const password = getString(formData.get("password"));
     const rawOwnerAgentId = getString(formData.get("ownerAgentId"));
     const rawParentMemberId = getString(formData.get("parentMemberId"));
@@ -277,6 +290,8 @@ export async function updateUserProfileAction(
       return { ok: false, message: "ไม่พบผู้ใช้" };
     }
 
+    const role = parseRole(requestedRole || user.role);
+
     const duplicateRows = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT id
       FROM "User"
@@ -290,7 +305,7 @@ export async function updateUserProfileAction(
     }
 
     const { memberType, isSharedMember, ownerAgentId, parentMemberId } =
-      user.role === Role.CUSTOMER
+      role === Role.CUSTOMER
         ? resolveCustomerShape({
             sessionUserId: "admin",
             rawOwnerAgentId,
@@ -315,6 +330,7 @@ export async function updateUserProfileAction(
           name = ${name},
           username = ${username},
           phone = ${phone || null},
+          role = ${role}::"Role",
           "isSharedMember" = ${isSharedMember},
           "ownerAgentId" = ${ownerAgentId},
           "parentMemberId" = ${parentMemberId},
@@ -331,6 +347,7 @@ export async function updateUserProfileAction(
           name = ${name},
           username = ${username},
           phone = ${phone || null},
+          role = ${role}::"Role",
           "isSharedMember" = ${isSharedMember},
           "ownerAgentId" = ${ownerAgentId},
           "parentMemberId" = ${parentMemberId},

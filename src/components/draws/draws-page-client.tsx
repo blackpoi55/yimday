@@ -133,12 +133,18 @@ export function DrawsPageClient({ draws, defaults }: DrawsPageClientProps) {
       );
     }
 
+    const statusLabel =
+      draw.status === DrawStatus.RESULTED ? "ออกผลแล้ว" : draw.status === DrawStatus.UPCOMING ? "รอเปิดรับโพย" : "ปิดรับโพย";
+    const statusClass =
+      draw.status === DrawStatus.RESULTED
+        ? "legacy-btn-info legacy-status-btn"
+        : draw.status === DrawStatus.UPCOMING
+          ? "legacy-btn-default legacy-status-btn"
+          : "legacy-btn-danger legacy-status-btn";
+
     return (
-      <button
-        className={draw.status === DrawStatus.RESULTED ? "legacy-btn-info legacy-status-btn" : "legacy-btn-danger legacy-status-btn"}
-        type="button"
-      >
-        {draw.status === DrawStatus.RESULTED ? "ออกผลแล้ว" : "ปิดรับโพย"}
+      <button className={statusClass} type="button">
+        {statusLabel}
       </button>
     );
   }

@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 import { DrawsPageClient } from "@/components/draws/draws-page-client";
 import { requireSession } from "@/lib/auth";
 import { toDateInputValue, toTimeInputValue } from "@/lib/dates";
+import { getEffectiveDrawStatus } from "@/lib/draw-window";
 import { prisma } from "@/lib/prisma";
 
 function toIsoDate(value: Date) {
@@ -29,6 +30,8 @@ export default async function DrawsPage() {
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const renderedAt = new Date();
+
   return (
     <DrawsPageClient
       defaults={{
@@ -47,7 +50,7 @@ export default async function DrawsPage() {
         openTime: toClock(draw.openAt),
         closeDate: toIsoDate(draw.closeAt),
         closeTime: toClock(draw.closeAt),
-        status: draw.status,
+        status: getEffectiveDrawStatus(draw, renderedAt),
         notes: draw.notes,
         result: draw.DrawResult
           ? {

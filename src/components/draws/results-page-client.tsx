@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DrawStatus } from "@prisma/client";
 import { Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
@@ -12,6 +13,7 @@ import { saveDrawResultAction } from "@/lib/actions/draws";
 type ResultRow = {
   id: string;
   name: string;
+  status: DrawStatus;
   result?: {
     firstPrize?: string | null;
     firstPrizeAdjacent?: string | null;
@@ -37,6 +39,10 @@ type ResultsPageClientProps = {
 
 function normalizeDigits(value: string, maxLength: number) {
   return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function canSaveResult(draw: ResultRow) {
+  return draw.status === DrawStatus.CLOSED || draw.status === DrawStatus.RESULTED;
 }
 
 export function ResultsPageClient({ draws }: ResultsPageClientProps) {
@@ -113,25 +119,31 @@ export function ResultsPageClient({ draws }: ResultsPageClientProps) {
             </tr>
           </thead>
           <tbody>
-            {draws.map((draw) => (
-              <tr key={draw.id}>
-                <td>{draw.name}</td>
-                <td>{draw.result?.firstPrize ?? "-"}</td>
-                <td>{draw.result?.top3 ?? "-"}</td>
-                <td>{draw.result?.top2 ?? draw.result?.top3?.slice(-2) ?? "-"}</td>
-                <td>{draw.result?.bottom3 ?? "-"}</td>
-                <td>{draw.result?.bottom2 ?? "-"}</td>
-                <td className="text-center">
-                  <button
-                    className={draw.result ? "legacy-btn-info legacy-icon-btn" : "legacy-btn-success legacy-icon-btn"}
-                    onClick={() => openModal(draw)}
-                    type="button"
-                  >
-                    <Pencil className="size-14px" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {draws.map((draw) => {
+              const saveEnabled = canSaveResult(draw);
+
+              return (
+                <tr key={draw.id}>
+                  <td>{draw.name}</td>
+                  <td>{draw.result?.firstPrize ?? "-"}</td>
+                  <td>{draw.result?.top3 ?? "-"}</td>
+                  <td>{draw.result?.top2 ?? draw.result?.top3?.slice(-2) ?? "-"}</td>
+                  <td>{draw.result?.bottom3 ?? "-"}</td>
+                  <td>{draw.result?.bottom2 ?? "-"}</td>
+                  <td className="text-center">
+                    <button
+                      className={draw.result ? "legacy-btn-info legacy-icon-btn" : "legacy-btn-success legacy-icon-btn"}
+                      disabled={!saveEnabled}
+                      onClick={() => openModal(draw)}
+                      title={saveEnabled ? undefined : "ต้องปิดรับโพยก่อนบันทึกผล"}
+                      type="button"
+                    >
+                      <Pencil className="size-14px" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

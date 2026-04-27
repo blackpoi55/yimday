@@ -84,9 +84,9 @@ function getTabMeta(tab: "member" | "client" | "staff") {
       };
     case "staff":
       return {
-        addTitle: "เพิ่มพนักงาน",
-        editTitle: "แก้ไขข้อมูลพนักงาน",
-        buttonLabel: "เพิ่มพนักงาน",
+        addTitle: "เพิ่มพนักงาน / Admin",
+        editTitle: "แก้ไขข้อมูลพนักงาน / Admin",
+        buttonLabel: "เพิ่มพนักงาน / Admin",
       };
     default:
       return {
@@ -146,6 +146,17 @@ function getMemberTypeLabel(memberType: MemberType | null) {
     case MEMBER_TYPE.MEMBER:
     default:
       return "สมาชิกทั่วไป";
+  }
+}
+
+function getRoleLabel(role: Role) {
+  switch (role) {
+    case Role.ADMIN:
+      return "Admin";
+    case Role.AGENT:
+      return "พนักงาน";
+    default:
+      return "สมาชิก";
   }
 }
 
@@ -260,7 +271,19 @@ function AddUserForm({
         void validatePasswordBeforeSubmit(event, selectedTab);
       }}
     >
-      <input name="role" type="hidden" value={selectedTab === "staff" ? Role.AGENT : Role.CUSTOMER} />
+      {selectedTab === "staff" ? (
+        <div>
+          <label className="legacy-form-label" htmlFor="role">
+            ประเภทผู้ใช้
+          </label>
+          <Select defaultValue={Role.AGENT} id="role" name="role">
+            <option value={Role.AGENT}>พนักงาน</option>
+            <option value={Role.ADMIN}>Admin</option>
+          </Select>
+        </div>
+      ) : (
+        <input name="role" type="hidden" value={Role.CUSTOMER} />
+      )}
 
       {selectedTab === "client" ? (
         <>
@@ -380,6 +403,7 @@ function EditUserForm({
       }}
     >
       <input name="userId" type="hidden" value={editingUser.id} />
+      {selectedTab !== "staff" ? <input name="role" type="hidden" value={editingUser.role} /> : null}
 
       {selectedTab === "client" ? (
         <>
@@ -410,6 +434,17 @@ function EditUserForm({
         </>
       ) : (
         <>
+          {selectedTab === "staff" ? (
+            <div>
+              <label className="legacy-form-label" htmlFor={`edit-role-${editingUser.id}`}>
+                ประเภทผู้ใช้
+              </label>
+              <Select defaultValue={editingUser.role} id={`edit-role-${editingUser.id}`} name="role">
+                <option value={Role.AGENT}>พนักงาน</option>
+                <option value={Role.ADMIN}>Admin</option>
+              </Select>
+            </div>
+          ) : null}
           {selectedTab === "member" ? (
             <div>
               <label className="legacy-form-label" htmlFor={`edit-memberType-${editingUser.id}`}>
@@ -503,6 +538,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, agents, defau
               {selectedTab === "client" ? <th>หัวหน้าสาย</th> : <th>username</th>}
               {selectedTab === "member" ? <th>ประเภทสมาชิก</th> : null}
               {selectedTab === "member" ? <th>พนักงาน</th> : null}
+              {selectedTab === "staff" ? <th>ประเภทผู้ใช้</th> : null}
               {selectedTab !== "client" ? <th>password</th> : null}
               <th>สถานะการใช้งาน</th>
               <th>แก้ไข</th>
@@ -516,6 +552,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, agents, defau
                 {selectedTab === "client" ? <td>{user.managerName}</td> : <td>{user.tableUsername ?? user.username}</td>}
                 {selectedTab === "member" ? <td>{getMemberTypeLabel(user.memberType)}</td> : null}
                 {selectedTab === "member" ? <td>{user.isSharedMember ? "ทุกคน" : user.managerName}</td> : null}
+                {selectedTab === "staff" ? <td>{getRoleLabel(user.role)}</td> : null}
                 {selectedTab !== "client" ? <td>{user.tablePassword ?? user.passwordPlain ?? "****"}</td> : null}
                 <td>
                   <form action={toggleUserActiveAction}>
@@ -535,7 +572,7 @@ export function UsersPageClient({ selectedTab, users, mainMembers, agents, defau
             ))}
             {users.length === 0 ? (
               <tr>
-                <td colSpan={selectedTab === "client" ? 5 : selectedTab === "member" ? 8 : 6}>ยังไม่มีข้อมูล</td>
+                <td colSpan={selectedTab === "client" ? 5 : selectedTab === "member" ? 8 : 7}>ยังไม่มีข้อมูล</td>
               </tr>
             ) : null}
           </tbody>

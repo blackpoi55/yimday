@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Role } from "@prisma/client";
+import { DrawStatus, Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { TicketEntry } from "@/components/tickets/ticket-entry";
 import { requireSession } from "@/lib/auth";
@@ -28,7 +28,9 @@ export default async function NewTicketPage({ searchParams }: NewTicketPageProps
   const [draws, customers, payoutProfiles] = await Promise.all([
     prisma.draw.findMany({
       where: {
-        status: "OPEN",
+        status: {
+          in: [DrawStatus.OPEN, DrawStatus.UPCOMING],
+        },
         openAt: {
           lte: now,
         },

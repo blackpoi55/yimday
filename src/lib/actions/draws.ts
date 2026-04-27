@@ -7,6 +7,7 @@ import { evaluateBet } from "@/lib/bet-utils";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { buildCode, createDateTime, getString, toNumber } from "@/lib/utils";
+import { getEffectiveDrawStatus } from "@/lib/draw-window";
 
 function normalizePrizeList(rawValue: string, digits: number, expectedCount: number, label: string) {
   const tokens = rawValue
@@ -29,6 +30,24 @@ function normalizePrizeList(rawValue: string, digits: number, expectedCount: num
   }
 
   return tokens.join("\n");
+}
+
+function normalizePrizeValue(rawValue: string, digits: number, label: string, required = false) {
+  const normalized = rawValue.replace(/\D/g, "");
+
+  if (!normalized) {
+    if (required) {
+      throw new Error(`${label} ต้องเป็นตัวเลข ${digits} หลัก`);
+    }
+
+    return null;
+  }
+
+  if (normalized.length !== digits) {
+    throw new Error(`${label} ต้องเป็นตัวเลข ${digits} หลัก`);
+  }
+
+  return normalized;
 }
 
 export async function createDrawAction(formData: FormData) {
@@ -68,8 +87,16 @@ export async function createDrawAction(formData: FormData) {
     throw new Error("เวลาเปิดรับโพยต้องน้อยกว่าเวลาปิด");
   }
 
-  const drawId = crypto.randomUUID();
   const now = new Date();
+  const drawId = crypto.randomUUID();
+  const status = getEffectiveDrawStatus(
+    {
+      status: DrawStatus.OPEN,
+      openAt,
+      closeAt,
+    },
+    now,
+  );
 
   await prisma.draw.create({
     data: {
@@ -79,7 +106,7 @@ export async function createDrawAction(formData: FormData) {
       drawDate: drawAt,
       openAt,
       closeAt,
-      status: openAt > now ? DrawStatus.UPCOMING : DrawStatus.OPEN,
+      status,
       notes: notes || null,
       createdById: session.userId,
       updatedAt: now,
@@ -207,6 +234,30 @@ export async function updateDrawAction(formData: FormData) {
     throw new Error("เวลาเปิดต้องน้อยกว่าเวลาปิด");
   }
 
+  const existingDraw = await prisma.draw.findUnique({
+    where: { id: drawId },
+    select: {
+      status: true,
+    },
+  });
+
+  if (!existingDraw) {
+    throw new Error("ไม่พบงวดที่ต้องการแก้ไข");
+  }
+
+  const now = new Date();
+  const status =
+    existingDraw.status === DrawStatus.RESULTED || existingDraw.status === DrawStatus.CLOSED
+      ? existingDraw.status
+      : getEffectiveDrawStatus(
+          {
+            status: existingDraw.status,
+            openAt,
+            closeAt,
+          },
+          now,
+        );
+
   await prisma.draw.update({
     where: { id: drawId },
     data: {
@@ -214,8 +265,9 @@ export async function updateDrawAction(formData: FormData) {
       drawDate: drawAt,
       openAt,
       closeAt,
+      status,
       notes: notes || null,
-      updatedAt: new Date(),
+      updatedAt: now,
     },
   });
 
@@ -292,8 +344,6 @@ export async function saveDrawResultAction(formData: FormData) {
   const thirdPrize = getString(formData.get("thirdPrize"));
   const fourthPrize = getString(formData.get("fourthPrize"));
   const fifthPrize = getString(formData.get("fifthPrize"));
-  const top3 = getString(formData.get("top3"));
-  const top2 = getString(formData.get("top2"));
   const bottom2 = getString(formData.get("bottom2"));
   const bottom3 = getString(formData.get("bottom3"));
   const front3 = getString(formData.get("front3"));
@@ -302,14 +352,39 @@ export async function saveDrawResultAction(formData: FormData) {
   const back3Second = getString(formData.get("back3Second"));
   const notes = getString(formData.get("notes"));
 
-  const resolvedTop3 = firstPrize.length === 6 ? firstPrize.slice(-3) : top3;
-  const resolvedTop2 = firstPrize.length === 6 ? firstPrize.slice(-2) : top2 || resolvedTop3.slice(-2);
-
-  if (!drawId || firstPrize.length !== 6 || resolvedTop3.length !== 3 || bottom2.length !== 2) {
-    throw new Error("กรุณากรอกผลรางวัลหลักให้ครบ");
+  if (!drawId) {
+    throw new Error("ไม่พบงวดที่ต้องการบันทึกผล");
   }
 
   const now = new Date();
+  const draw = await prisma.draw.findUnique({
+    where: { id: drawId },
+    select: {
+      status: true,
+      openAt: true,
+      closeAt: true,
+    },
+  });
+
+  if (!draw) {
+    throw new Error("ไม่พบงวดที่ต้องการบันทึกผล");
+  }
+
+  const effectiveStatus = getEffectiveDrawStatus(draw, now);
+
+  if (effectiveStatus === DrawStatus.UPCOMING || effectiveStatus === DrawStatus.OPEN) {
+    throw new Error("ต้องปิดรับโพยก่อนบันทึกผลรางวัล");
+  }
+
+  const normalizedFirstPrize = normalizePrizeValue(firstPrize, 6, "รางวัลที่ 1", true) ?? "";
+  const normalizedBottom2 = normalizePrizeValue(bottom2, 2, "2 ตัวล่าง", true) ?? "";
+  const normalizedBottom3 = normalizePrizeValue(bottom3, 3, "3 ตัวล่าง");
+  const normalizedFront3 = normalizePrizeValue(front3, 3, "3 ตัวหน้า ชุดที่ 1");
+  const normalizedFront3Second = normalizePrizeValue(front3Second, 3, "3 ตัวหน้า ชุดที่ 2");
+  const normalizedBack3 = normalizePrizeValue(back3, 3, "3 ตัวท้าย ชุดที่ 1");
+  const normalizedBack3Second = normalizePrizeValue(back3Second, 3, "3 ตัวท้าย ชุดที่ 2");
+  const resolvedTop3 = normalizedFirstPrize.slice(-3);
+  const resolvedTop2 = normalizedFirstPrize.slice(-2);
   const normalizedFirstPrizeAdjacent = normalizePrizeList(firstPrizeAdjacent, 6, 2, "เลขข้างเคียงรางวัลที่ 1");
   const normalizedSecondPrize = normalizePrizeList(secondPrize, 6, 5, "รางวัลที่ 2");
   const normalizedThirdPrize = normalizePrizeList(thirdPrize, 6, 10, "รางวัลที่ 3");
@@ -317,7 +392,7 @@ export async function saveDrawResultAction(formData: FormData) {
   const normalizedFifthPrize = normalizePrizeList(fifthPrize, 6, 100, "รางวัลที่ 5");
 
   const resultRecord = {
-    firstPrize,
+    firstPrize: normalizedFirstPrize,
     firstPrizeAdjacent: normalizedFirstPrizeAdjacent,
     secondPrize: normalizedSecondPrize,
     thirdPrize: normalizedThirdPrize,
@@ -325,12 +400,12 @@ export async function saveDrawResultAction(formData: FormData) {
     fifthPrize: normalizedFifthPrize,
     top3: resolvedTop3,
     top2: resolvedTop2,
-    bottom2,
-    bottom3: bottom3 || null,
-    front3: front3 || null,
-    front3Second: front3Second || null,
-    back3: back3 || null,
-    back3Second: back3Second || null,
+    bottom2: normalizedBottom2,
+    bottom3: normalizedBottom3,
+    front3: normalizedFront3,
+    front3Second: normalizedFront3Second,
+    back3: normalizedBack3,
+    back3Second: normalizedBack3Second,
     notes: notes || null,
     updatedAt: now,
   };

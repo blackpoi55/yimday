@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
 import { ResultsPageClient } from "@/components/draws/results-page-client";
 import { requireSession } from "@/lib/auth";
+import { getEffectiveDrawStatus } from "@/lib/draw-window";
 import { prisma } from "@/lib/prisma";
 
 export default async function ResultsPage() {
@@ -15,6 +16,8 @@ export default async function ResultsPage() {
     },
   });
 
+  const renderedAt = new Date();
+
   return (
     <div className="legacy-container">
       <div className="mb-6" />
@@ -23,6 +26,7 @@ export default async function ResultsPage() {
         draws={draws.map((draw) => ({
           id: draw.id,
           name: draw.name,
+          status: getEffectiveDrawStatus(draw, renderedAt),
           result: draw.DrawResult
             ? {
                 firstPrize: draw.DrawResult.firstPrize,

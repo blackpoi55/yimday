@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createBetSplitAction } from "@/lib/actions/monitor";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
@@ -139,6 +137,38 @@ function getBetTypeLabel(betType: string) {
   }
 }
 
+function getTabForBetType(betType: string) {
+  switch (betType) {
+    case "TWO_TOP":
+      return "two-top";
+    case "TWO_BOTTOM":
+      return "two-bottom";
+    case "THREE_STRAIGHT":
+      return "three-straight";
+    case "THREE_TOD":
+      return "three-tod";
+    case "THREE_BOTTOM":
+      return "three-bottom";
+    case "TWO_TOD":
+      return "two-tod";
+    case "RUN_TOP":
+      return "run-top";
+    case "RUN_BOTTOM":
+      return "run-bottom";
+    default:
+      return null;
+  }
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+
 function canonicalDigits(value: string) {
   return value.split("").sort().join("");
 }
@@ -237,7 +267,7 @@ function buildThreeTodRows(bucket: string, totals: Record<string, number>) {
 export function MonitorClient({
   draws,
   selectedDrawId,
-  selectedTab,
+  selectedTab: initialSelectedTab,
   selectedBucket,
   twoTopGrid,
   twoBottomGrid,
@@ -259,7 +289,12 @@ export function MonitorClient({
   const [splitAmount, setSplitAmount] = useState<number | null>(null);
   const [isSavingSplit, setIsSavingSplit] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [searchTrigger, setSearchTrigger] = useState("");
+  const deferredSearchText = useDeferredValue(searchText);
+  const searchQuery = deferredSearchText.trim();
+  const [forcedSearchMode, setForcedSearchMode] = useState(false);
+  const [searchOriginTab, setSearchOriginTab] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedTab = forcedSearchMode && searchOriginTab === initialSelectedTab ? "search" : initialSelectedTab;
   const isDetailModalOpen = Boolean(activeNumber && activeType);
   const detailModalTitle = activeNumber && activeType ? `${getBetTypeLabel(activeType)} : ${activeNumber}` : "";
   const splitModalTitle = splitTarget ? `${getBetTypeLabel(splitTarget.betType)} ${splitTarget.number}` : "";
@@ -290,7 +325,7 @@ export function MonitorClient({
   );
 
   const searchResults = useMemo(() => {
-    const needle = searchTrigger.trim();
+    const needle = searchQuery;
     if (!needle) {
       return [];
     }
@@ -314,12 +349,55 @@ export function MonitorClient({
     }
 
     return [...totals.values()].sort((a, b) => b.total - a.total);
-  }, [detailRows, searchTrigger]);
+  }, [detailRows, searchQuery]);
 
   const threeTodRows = useMemo(
     () => buildThreeTodRows(selectedBucket, Object.fromEntries(threeTodTop.map((item) => [item.number, item.total]))),
     [selectedBucket, threeTodTop],
   );
+
+  const handleGlobalSearchHotkey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.metaKey || event.ctrlKey || event.altKey || isEditableTarget(event.target) || isDetailModalOpen || Boolean(splitTarget)) {
+      return;
+    }
+
+    if (event.key === "Escape" && forcedSearchMode) {
+      event.preventDefault();
+      setForcedSearchMode(false);
+      setSearchOriginTab(null);
+      setSearchText("");
+      return;
+    }
+
+    if (!/^\d$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    setForcedSearchMode(true);
+    setSearchOriginTab(initialSelectedTab);
+    setSearchText((previous) => `${selectedTab === "search" ? previous : ""}${event.key}`.slice(0, 3));
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleGlobalSearchHotkey);
+    return () => window.removeEventListener("keydown", handleGlobalSearchHotkey);
+  }, []);
+
+  useEffect(() => {
+    if (selectedTab !== "search") {
+      return;
+    }
+
+    searchInputRef.current?.focus();
+    searchInputRef.current?.setSelectionRange(searchText.length, searchText.length);
+  }, [selectedTab, searchText]);
+
+  function resetSearchMode() {
+    setForcedSearchMode(false);
+    setSearchOriginTab(null);
+    setSearchText("");
+  }
 
   function openDetail(number: string, tab: string) {
     const types = getBetTypeKeysForTab(tab);
@@ -538,6 +616,7 @@ export function MonitorClient({
             className="legacy-monitor-select"
             value={selectedDrawId}
             onChange={(event) => {
+              resetSearchMode();
               router.push(buildHref(event.target.value, selectedTab, selectedBucket));
             }}
           >
@@ -551,16 +630,16 @@ export function MonitorClient({
 
         <div className="mt-[15px]">
           <div className="legacy-tab-nav">
-            <Link className={selectedTab === "two-top" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-top", selectedBucket)}>2 ตัวบน</Link>
-            <Link className={selectedTab === "two-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-bottom", selectedBucket)}>2 ตัวล่าง</Link>
-            <Link className={selectedTab === "three-straight" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-straight", selectedBucket)}>3 บน</Link>
-            <Link className={selectedTab === "three-tod" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-tod", selectedBucket)}>3 โต๊ด</Link>
-            <Link className={selectedTab === "three-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-bottom", selectedBucket)}>3 ล่าง</Link>
-            <Link className={selectedTab === "two-tod" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-tod", selectedBucket)}>คู่โต๊ด</Link>
-            <Link className={selectedTab === "run-top" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "run-top", selectedBucket)}>ลอยบน</Link>
-            <Link className={selectedTab === "run-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "run-bottom", selectedBucket)}>ลอยล่าง</Link>
-            <Link className={selectedTab === "over-limit" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "over-limit", selectedBucket)}>รายการเกินอั้น</Link>
-            <Link className={selectedTab === "search" ? "legacy-tab-link active ml-auto" : "legacy-tab-link ml-auto"} href={buildHref(selectedDrawId, "search", selectedBucket)}>ค้นหา</Link>
+            <Link className={selectedTab === "two-top" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-top", selectedBucket)} onClick={resetSearchMode}>2 ตัวบน</Link>
+            <Link className={selectedTab === "two-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-bottom", selectedBucket)} onClick={resetSearchMode}>2 ตัวล่าง</Link>
+            <Link className={selectedTab === "three-straight" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-straight", selectedBucket)} onClick={resetSearchMode}>3 บน</Link>
+            <Link className={selectedTab === "three-tod" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-tod", selectedBucket)} onClick={resetSearchMode}>3 โต๊ด</Link>
+            <Link className={selectedTab === "three-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "three-bottom", selectedBucket)} onClick={resetSearchMode}>3 ล่าง</Link>
+            <Link className={selectedTab === "two-tod" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "two-tod", selectedBucket)} onClick={resetSearchMode}>คู่โต๊ด</Link>
+            <Link className={selectedTab === "run-top" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "run-top", selectedBucket)} onClick={resetSearchMode}>ลอยบน</Link>
+            <Link className={selectedTab === "run-bottom" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "run-bottom", selectedBucket)} onClick={resetSearchMode}>ลอยล่าง</Link>
+            <Link className={selectedTab === "over-limit" ? "legacy-tab-link active" : "legacy-tab-link"} href={buildHref(selectedDrawId, "over-limit", selectedBucket)} onClick={resetSearchMode}>รายการเกินอั้น</Link>
+            <Link className={selectedTab === "search" ? "legacy-tab-link active ml-auto" : "legacy-tab-link ml-auto"} href={buildHref(selectedDrawId, "search", selectedBucket)} onClick={resetSearchMode}>ค้นหา</Link>
           </div>
 
           <div className="pt-[15px]">
@@ -617,21 +696,12 @@ export function MonitorClient({
 
             {selectedTab === "search" ? (
               <div className="space-y-4">
-                <div className="flex max-w-[420px] items-center gap-2">
-                  <Input
+                <div className="max-w-[420px]">
+                  <Input ref={searchInputRef}
                     placeholder="ค้นหาเลข"
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value.replace(/\D/g, "").slice(0, 3))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        setSearchTrigger(searchText);
-                      }
-                    }}
                   />
-                  <Button onClick={() => setSearchTrigger(searchText)} variant="primary">
-                    <Search className="size-4" />
-                  </Button>
                 </div>
 
                 <div style={{ width: "100%", display: "table" }}>
@@ -639,9 +709,25 @@ export function MonitorClient({
                     <button
                       key={item.type}
                       onClick={() => {
-                        setActiveNumber(searchTrigger);
-                        setActiveType(item.type);
-                        setSplitAmount(null);
+                        const targetTab = getTabForBetType(item.type);
+                        if (!targetTab) {
+                          setActiveNumber(searchQuery);
+                          setActiveType(item.type);
+                          setSplitAmount(null);
+                          return;
+                        }
+
+                        setForcedSearchMode(false);
+                        setSearchOriginTab(null);
+                        router.push(
+                          buildHref(
+                            selectedDrawId,
+                            targetTab,
+                            targetTab === "three-straight" || targetTab === "three-bottom" || targetTab === "three-tod"
+                              ? searchQuery[0]
+                              : undefined,
+                          ),
+                        );
                       }}
                       style={{
                         width: "280px",
@@ -657,10 +743,10 @@ export function MonitorClient({
                       }}
                       type="button"
                     >
-                      ({item.type}) {searchTrigger} = {formatCurrency(item.total)}
+                      ({item.type}) {searchQuery} = {formatCurrency(item.total)}
                     </button>
                   ))}
-                  {searchTrigger && searchResults.length === 0 ? <div className="text-sm text-muted-foreground">ไม่พบข้อมูลเลขนี้</div> : null}
+                  {searchQuery && searchResults.length === 0 ? <div className="text-sm text-muted-foreground">ไม่พบข้อมูลเลขนี้</div> : null}
                 </div>
               </div>
             ) : null}
