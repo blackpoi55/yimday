@@ -28,3 +28,16 @@ export function showWarningAlert(message: string, title = "ข้อมูลไ
     confirmButtonText: "ตกลง",
   });
 }
+
+export function showConfirmAlert(title: string, text: string, confirmButtonText = "ยืนยัน", cancelButtonText = "ยกเลิก") {
+  return Swal.fire({
+    icon: "warning",
+    title,
+    text,
+    showCancelButton: true,
+    confirmButtonText,
+    cancelButtonText,
+    reverseButtons: true,
+    focusCancel: true,
+  });
+}

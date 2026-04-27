@@ -8,8 +8,8 @@ import { FormSubmit } from "@/components/ui/form-submit";
 import { Input } from "@/components/ui/input";
 import { LegacyModal } from "@/components/ui/legacy-modal";
 import { Textarea } from "@/components/ui/textarea";
-import { showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
-import { clearOldDrawAction, createDrawAction, saveDrawResultAction, updateDrawAction } from "@/lib/actions/draws";
+import { showConfirmAlert, showErrorAlert, showSuccessAlert } from "@/lib/client-alerts";
+import { clearOldDrawAction, createDrawAction, deleteDrawAction, removeDrawAction, saveDrawResultAction, updateDrawAction } from "@/lib/actions/draws";
 
 type DrawRow = {
   id: string;
@@ -165,6 +165,57 @@ export function DrawsPageClient({ draws, defaults }: DrawsPageClientProps) {
     await runActionWithAlert(formData, clearOldDrawAction, `ล้างงวด ${oldDraw.name} เรียบร้อย`);
   }
 
+  async function handleDeleteDraw(draw: DrawRow) {
+    const confirmed = window.confirm(`เธ•เนเธญเธเธเธฒเธฃเธฅเธเธเธงเธ” "${draw.name}" เนเธเนเธซเธฃเธทเธญเนเธกเน`);
+    if (!confirmed) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("drawId", draw.id);
+
+    await runActionWithAlert(formData, deleteDrawAction, `เธฅเธเธเธงเธ” ${draw.name} เน€เธฃเธตเธขเธเธฃเนเธญเธข`);
+  }
+
+  async function confirmClearOldDraw() {
+    if (!oldDraw) {
+      return;
+    }
+
+    const result = await showConfirmAlert(
+      "ยืนยันการล้างงวดเก่า",
+      `ต้องการล้างงวด "${oldDraw.name}" และเก็บงวดล่าสุดไว้ใช่หรือไม่`,
+      "ล้างงวด",
+    );
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("drawId", oldDraw.id);
+
+    await runActionWithAlert(formData, clearOldDrawAction, `ล้างงวด ${oldDraw.name} เรียบร้อย`);
+  }
+
+  async function confirmDeleteDraw(draw: DrawRow) {
+    const result = await showConfirmAlert(
+      "ยืนยันการลบงวด",
+      `ต้องการลบงวด "${draw.name}" ใช่หรือไม่`,
+      "ลบงวด",
+    );
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("drawId", draw.id);
+
+    await runActionWithAlert(formData, removeDrawAction, `ลบงวด ${draw.name} เรียบร้อย`);
+  }
+
+  void handleClearOldDraw;
+  void handleDeleteDraw;
+
   return (
     <div className="legacy-container">
       <div className="mb-6 flex flex-col gap-4 rounded-[24px] border border-[#d7e2ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] lg:flex-row lg:items-center lg:justify-between">
@@ -182,7 +233,7 @@ export function DrawsPageClient({ draws, defaults }: DrawsPageClientProps) {
           <button
             className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[14px] border border-[#f1c27d] bg-[linear-gradient(135deg,#fbbf24_0%,#f59e0b_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(245,158,11,0.24)] transition-[transform,box-shadow,filter] duration-200 hover:-translate-y-px hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0"
             disabled={!oldDraw}
-            onClick={handleClearOldDraw}
+            onClick={confirmClearOldDraw}
             type="button"
           >
             <Trash2 className="size-4" />
@@ -213,6 +264,7 @@ export function DrawsPageClient({ draws, defaults }: DrawsPageClientProps) {
               <th>เวลาที่ปิดรับโพย</th>
               <th>สถานะ</th>
               <th>แก้ไข</th>
+              <th>ลบ</th>
             </tr>
           </thead>
           <tbody>
@@ -227,6 +279,11 @@ export function DrawsPageClient({ draws, defaults }: DrawsPageClientProps) {
                 <td className="text-center">
                   <button className="legacy-btn-info legacy-icon-btn" onClick={() => setModal({ type: "edit", draw })} type="button">
                     <Pencil className="size-14px" />
+                  </button>
+                </td>
+                <td className="text-center">
+                  <button className="legacy-btn-danger legacy-icon-btn" onClick={() => void confirmDeleteDraw(draw)} type="button">
+                    <Trash2 className="size-14px" />
                   </button>
                 </td>
               </tr>

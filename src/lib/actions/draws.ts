@@ -50,6 +50,55 @@ function normalizePrizeValue(rawValue: string, digits: number, label: string, re
   return normalized;
 }
 
+async function deleteDrawWithRelatedRecords(drawId: string) {
+  await prisma.$transaction(async (tx) => {
+    await tx.betItemSplit.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.blockedNumber.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.drawResult.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.betRate.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.ticket.deleteMany({
+      where: {
+        drawId,
+      },
+    });
+
+    await tx.draw.delete({
+      where: {
+        id: drawId,
+      },
+    });
+  });
+}
+
+function revalidateDrawPages() {
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/draws");
+  revalidatePath("/dashboard/rates");
+  revalidatePath("/dashboard/results");
+  revalidatePath("/dashboard/winners");
+  revalidatePath("/dashboard/tickets");
+}
+
 export async function createDrawAction(formData: FormData) {
   const session = await requireSession([Role.ADMIN]);
   const name = getString(formData.get("name"));
@@ -164,50 +213,56 @@ export async function clearOldDrawAction(formData: FormData) {
     throw new Error("ต้องล้างงวดที่เก่ากว่าก่อน และเก็บงวดล่าสุดไว้");
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.betItemSplit.deleteMany({
-      where: {
-        drawId,
-      },
-    });
+  await deleteDrawWithRelatedRecords(drawId);
+  revalidateDrawPages();
+}
 
-    await tx.blockedNumber.deleteMany({
-      where: {
-        drawId,
-      },
-    });
+export async function deleteDrawAction(formData: FormData) {
+  await requireSession([Role.ADMIN]);
 
-    await tx.drawResult.deleteMany({
-      where: {
-        drawId,
-      },
-    });
+  const drawId = getString(formData.get("drawId"));
 
-    await tx.betRate.deleteMany({
-      where: {
-        drawId,
-      },
-    });
+  if (!drawId) {
+    throw new Error("เนเธกเนเธเธเธเธงเธ”เธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธฅเธ");
+  }
 
-    await tx.ticket.deleteMany({
-      where: {
-        drawId,
-      },
-    });
-
-    await tx.draw.delete({
-      where: {
-        id: drawId,
-      },
-    });
+  const draw = await prisma.draw.findUnique({
+    where: { id: drawId },
+    select: {
+      id: true,
+    },
   });
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/draws");
-  revalidatePath("/dashboard/rates");
-  revalidatePath("/dashboard/results");
-  revalidatePath("/dashboard/winners");
-  revalidatePath("/dashboard/tickets");
+  if (!draw) {
+    throw new Error("เนเธกเนเธเธเธเธงเธ”เธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธฅเธ");
+  }
+
+  await deleteDrawWithRelatedRecords(drawId);
+  revalidateDrawPages();
+}
+
+export async function removeDrawAction(formData: FormData) {
+  await requireSession([Role.ADMIN]);
+
+  const drawId = getString(formData.get("drawId"));
+
+  if (!drawId) {
+    throw new Error("ไม่พบงวดที่ต้องการลบ");
+  }
+
+  const draw = await prisma.draw.findUnique({
+    where: { id: drawId },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!draw) {
+    throw new Error("ไม่พบงวดที่ต้องการลบ");
+  }
+
+  await deleteDrawWithRelatedRecords(drawId);
+  revalidateDrawPages();
 }
 
 export async function updateDrawAction(formData: FormData) {
