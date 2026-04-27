@@ -919,46 +919,43 @@ export function TicketEntry({
               </div>
             </div>
           </div>
-          <div className="panel">
-            <div className="panel-header">
-              <h2 className="text-lg font-medium">เลือกโหมดคีย์</h2>
-            </div>
-            <div className="panel-body space-y-4">
-              <div className="grid gap-3 md:grid-cols-4">
-                {availableEntryModeOptions.map((option) => (
+          {!isCustomerRole ? (
+            <div className="panel">
+              <div className="panel-header">
+                <h2 className="text-lg font-medium">เลือกโหมดคีย์</h2>
+              </div>
+              <div className="panel-body space-y-4">
+                <div className="grid gap-3 md:grid-cols-4">
+                  {availableEntryModeOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      className={`rounded-sm border px-4 py-3 text-left transition ${
+                        entryMode === option.key
+                          ? "border-primary bg-primary/10 text-primary shadow-sm"
+                          : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
+                      }`}
+                      onClick={() => setEntryMode(option.key)}
+                      type="button"
+                    >
+                      <div className="text-sm font-medium">{option.label}</div>
+                    </button>
+                  ))}
                   <button
-                    key={option.key}
+                    hidden
                     className={`rounded-sm border px-4 py-3 text-left transition ${
-                      entryMode === option.key
+                      entryMode === "NUMBER"
                         ? "border-primary bg-primary/10 text-primary shadow-sm"
                         : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
                     }`}
-                    onClick={() => setEntryMode(option.key)}
+                    onClick={() => setEntryMode("NUMBER")}
                     type="button"
                   >
-                    <div className="text-sm font-medium">{option.label}</div>
+                    <div className="text-sm font-medium">ระบุตัวเลข</div>
                   </button>
-                ))}
-                <button
-                  hidden
-                  className={`rounded-sm border px-4 py-3 text-left transition ${
-                    entryMode === "NUMBER"
-                      ? "border-primary bg-primary/10 text-primary shadow-sm"
-                      : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
-                  }`}
-                  onClick={() => setEntryMode("NUMBER")}
-                  type="button"
-                >
-                  <div className="text-sm font-medium">ระบุตัวเลข</div>
-                </button>
-              </div>
-              {isCustomerRole ? (
-                <div className="rounded-sm border border-[#dbe7f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#42526b]">
-                  สมาชิกคีย์โพยได้เฉพาะของตัวเอง และใช้ได้เฉพาะโหมดระบุตัวเลข
                 </div>
-              ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {entryMode === "HELPER" ? (
           <div className="panel">

@@ -139,7 +139,7 @@
   }
 
   .legacy-navbar-inner {
-    @apply flex min-h-[64px] w-full max-w-none items-center justify-between gap-4 px-4 py-2 lg:px-6;
+    @apply w-full max-w-none px-4 py-2 lg:flex lg:min-h-[64px] lg:items-center lg:justify-between lg:gap-4 lg:px-6;
     max-width: none !important;
     margin-inline: 0 !important;
   }
@@ -177,8 +177,73 @@
     @apply flex min-w-0 flex-1 items-center gap-3;
   }
 
+  .legacy-navbar-mobile-shell {
+    @apply w-full lg:hidden;
+  }
+
+  .legacy-navbar-mobile-top {
+    @apply flex items-center gap-3;
+  }
+
+  .legacy-navbar-mobile-top .legacy-navbar-brand {
+    @apply min-w-0 flex-1 px-3 py-2;
+  }
+
+  .legacy-navbar-mobile-top .legacy-navbar-brand-icon {
+    @apply h-10 w-10;
+  }
+
+  .legacy-navbar-mobile-top .legacy-navbar-brand-label {
+    @apply text-[9px];
+  }
+
+  .legacy-navbar-mobile-top .legacy-navbar-brand-name {
+    @apply text-[14px];
+  }
+
+  .legacy-navbar-mobile-top .legacy-role-badge {
+    @apply px-2 text-[9px];
+  }
+
+  .legacy-navbar-desktop {
+    @apply hidden w-full items-center justify-between gap-4 lg:flex;
+  }
+
   .legacy-navbar-right {
     @apply ml-auto flex shrink-0 items-center gap-2;
+  }
+
+  .legacy-mobile-menu-btn {
+    @apply inline-flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[20px] border border-white/18 bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md transition hover:bg-white/18;
+  }
+
+  .legacy-mobile-menu-panel {
+    @apply mt-3 rounded-[24px] border border-white/16 bg-white/10 p-3 shadow-[0_16px_36px_rgba(8,28,84,0.18)] backdrop-blur-md;
+  }
+
+  .legacy-mobile-clock {
+    @apply flex;
+  }
+
+  .legacy-mobile-clock .legacy-clock-wrap {
+    @apply min-h-[42px] w-full justify-center px-3 text-[12px];
+  }
+
+  .legacy-mobile-nav-list {
+    @apply mt-3 grid gap-2;
+  }
+
+  .legacy-mobile-nav-link {
+    @apply inline-flex min-h-[46px] items-center justify-start rounded-[16px] border border-white/10 px-4 text-[14px] font-medium text-white/88 no-underline transition-[background-color,color,border-color,box-shadow] duration-200 hover:border-white/16 hover:bg-white/12 hover:text-white hover:no-underline;
+  }
+
+  .legacy-mobile-nav-link.active {
+    @apply border-white/18 bg-white shadow-[0_10px_22px_rgba(8,28,84,0.18)];
+    color: var(--legacy-nav-secondary, #1146ae);
+  }
+
+  .legacy-mobile-logout {
+    @apply mt-3 w-full justify-center;
   }
 
   .legacy-nav {
@@ -506,6 +571,12 @@
   .size-14px {
     width: 14px;
     height: 14px;
+  }
+}
+
+@media (max-width: 639px) {
+  .legacy-page {
+    @apply px-3 py-4;
   }
 }
 
